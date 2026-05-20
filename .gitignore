@@ -1,0 +1,11 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+node_modules/
+frontend/dist/
+backend/src/main/resources/public/
+storage/
+.env
+.DS_Store

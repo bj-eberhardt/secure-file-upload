@@ -1,0 +1,25 @@
+micronaut:
+  application:
+    name: secure-upload
+  server:
+    port: 8080
+    max-request-size: 64MB
+    multipart:
+      max-file-size: 64MB
+  router:
+    static-resources:
+      default:
+        enabled: true
+        mapping: /**
+        paths:
+          - classpath:public
+
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+
+secure-upload:
+  storage-dir: storage/uploads
+  chunk-size: 8388608
+  default-expiry-hours: 72
