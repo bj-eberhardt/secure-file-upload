@@ -24,10 +24,11 @@ export async function encryptChunk(
 }
 
 export function packEncryptedChunk(chunk: EncryptedChunk): Uint8Array {
-  const out = new Uint8Array(4 + chunk.nonce.length + chunk.ciphertext.length)
+  const out = new Uint8Array(8 + chunk.nonce.length + chunk.ciphertext.length)
   const view = new DataView(out.buffer)
   view.setUint32(0, chunk.nonce.length, false)
-  out.set(chunk.nonce, 4)
-  out.set(chunk.ciphertext, 4 + chunk.nonce.length)
+  view.setUint32(4, chunk.ciphertext.length, false)
+  out.set(chunk.nonce, 8)
+  out.set(chunk.ciphertext, 8 + chunk.nonce.length)
   return out
 }

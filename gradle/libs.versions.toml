@@ -1,0 +1,25 @@
+[versions]
+kotlin = "2.3.21"
+micronaut = "5.0.0"
+micronautPlugin = "5.0.0"
+nodePlugin = "7.1.0"
+ksp = "2.3.7"
+micronautOpenapi = "4.7.4"
+swaggerUi = "4.18.3"
+swaggerAnnotations = "2.2.12"
+snakeyaml = "2.0"
+shadow="9.4.1"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin" }
+micronaut-application = { id = "io.micronaut.application", version.ref = "micronautPlugin" }
+node = { id = "com.github.node-gradle.node", version.ref = "nodePlugin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+shadow = { id = "com.gradleup.shadow", version.ref= "shadow" }
+
+[libraries]
+micronautOpenapi = { module = "io.micronaut.openapi:micronaut-openapi", version.ref = "micronautOpenapi" }
+swaggerUi = { module = "org.webjars:swagger-ui", version.ref = "swaggerUi" }
+swaggerAnnotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swaggerAnnotations" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }

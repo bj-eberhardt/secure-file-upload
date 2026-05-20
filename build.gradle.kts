@@ -1,11 +1,20 @@
 plugins {
-    kotlin("jvm") version "2.1.0" apply false
-    kotlin("plugin.allopen") version "2.1.0" apply false
-    id("io.micronaut.application") version "4.5.0" apply false
-    id("com.github.node-gradle.node") version "7.1.0" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.allopen) apply false
+    alias(libs.plugins.micronaut.application) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.node) apply false
+    alias(libs.plugins.shadow) apply false
 }
 
 tasks.register("buildAll") {
-    dependsOn(":frontend:copyFrontendToBackend")
-    dependsOn(":backend:build")
+    dependsOn(":frontend:copyFrontendToBackend", ":backend:build")
+}
+
+gradle.taskGraph.whenReady {
+    val frontendTask = rootProject.tasks.findByPath(":frontend:copyFrontendToBackend")
+    val backendTask = rootProject.tasks.findByPath(":backend:build")
+    if (frontendTask != null && backendTask != null) {
+        backendTask.mustRunAfter(frontendTask)
+    }
 }

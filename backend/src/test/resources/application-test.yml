@@ -1,0 +1,8 @@
+secure-upload:
+  rate-limit-enabled: false
+  cleanup-enabled: false
+
+micronaut:
+  server:
+    port: -1
+

@@ -6,6 +6,15 @@ micronaut:
     max-request-size: 64MB
     multipart:
       max-file-size: 64MB
+  security:
+    intercept-url-map:
+      - pattern: /swagger-ui/**
+        httpMethod: GET
+        access:
+          - isAnonymous()
+      - pattern: /swagger/**
+        access:
+          - isAnonymous()
   router:
     static-resources:
       default:
@@ -13,13 +22,43 @@ micronaut:
         mapping: /**
         paths:
           - classpath:public
+      swagger:
+        enabled: true
+        mapping: /swagger/**
+        paths:
+          - classpath:META-INF/swagger
+      swagger-ui:
+        enabled: true
+        mapping: /swagger-ui/**
+        paths:
+          - classpath:META-INF/swagger/views/swagger-ui
+
+swagger-ui:
+  enabled: true
+  copy-resources: true
 
 endpoints:
   health:
     enabled: true
     sensitive: false
 
+jackson:
+  serializationInclusion: ALWAYS
+
 secure-upload:
   storage-dir: storage/uploads
   chunk-size: 8388608
+  min-chunk-bytes: 1048576
   default-expiry-hours: 72
+  max-expiry-hours: 168
+  protocol-version: v1
+  max-chunk-bytes: 67108864
+  trust-proxy-headers: false
+  rate-limit-enabled: true
+  max-active-uploads-per-ip: 5
+  init-requests-per-minute: 30
+  download-requests-per-minute: 60
+  download-chunk-requests-per-minute: 600
+  upload-chunk-requests-per-minute: 600
+  cleanup-enabled: true
+  cleanup-interval-minutes: 15

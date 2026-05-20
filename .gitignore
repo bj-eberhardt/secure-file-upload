@@ -9,3 +9,11 @@ backend/src/main/resources/public/
 storage/
 .env
 .DS_Store
+.gradle-user-home/
+.kotlin/
+.npm-cache/
+frontend/playwright-report/
+frontend/test-results/
+hs_err_pid*.log
+replay_pid*.log
+tmp_*.html

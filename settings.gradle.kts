@@ -1,3 +1,11 @@
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -5,12 +13,6 @@ pluginManagement {
     }
 }
 
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        mavenCentral()
-    }
-}
 
 rootProject.name = "secure-upload"
 include("backend", "frontend")

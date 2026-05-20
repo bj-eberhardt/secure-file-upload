@@ -17,8 +17,8 @@ export async function importShareKey(value: string): Promise<CryptoKey> {
     'raw',
     raw,
     { name: 'AES-GCM' },
-    false,
-    ['decrypt']
+    true,
+    ['encrypt', 'decrypt']
   )
 }
 

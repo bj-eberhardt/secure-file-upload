@@ -38,25 +38,34 @@ Laut `README.md` und `docs/IMPLEMENTATION_PLAN.md`:
 - Komplett build: `./gradlew buildAll`
   - baut das Frontend und kopiert es nach `backend/src/main/resources/public`
 
+Hinweis (Sandbox/CI):
+
+- `gradlew`/`gradlew.bat` setzen `GRADLE_USER_HOME` und npm-Cache/Offline-Flags projektlokal, um Builds in eingeschränkten Umgebungen stabil zu machen.
+
 Vite Proxy für API:
 
-- `frontend/vite.config.ts` proxyt `/api` → `http://localhost:8080`
+- `frontend/vite.config.js` proxyt `/api/v1` → `http://localhost:8080`
 
 ## Backend: aktueller Stand
 
 **API-Endpunkte** (`backend/src/main/kotlin/app/api/UploadController.kt`):
 
-- `POST /api/uploads/init` → gibt `uploadId`, `chunkSize` und URLs zurück
-- `PUT /api/uploads/{id}/chunks/{index}` → speichert Chunk als `.part`
-- `POST /api/uploads/{id}/complete` → concat’t Chunks zu `blob.enc`, schreibt `upload.json`, optional `manifest.enc.b64`
-- `GET /api/uploads/{id}/status` → Upload-Status (Chunks + completed)
-- `GET /api/downloads/{id}` → liefert `blob.enc` als ByteArray (kein Streaming)
+- `POST /api/v1/uploads/init` → gibt `uploadId`, `chunkSize` und URLs zurück
+- `PUT /api/v1/uploads/{id}/chunks/{index}` → speichert Chunk als `.part`
+- `POST /api/v1/uploads/{id}/complete` → validiert Chunks/Hashes, schreibt `upload.json` + `manifest.enc.b64` (keine `blob.enc`-Kopie)
+- `GET /api/v1/uploads/{id}/status` → Upload-Status (Chunks + completed)
+
+Aktuell implementiert:
+
+- Protokoll-Versionierung per Metadaten (`protocolVersion` in Responses/Meta)
+- Expiry: `status`/`download` liefern `410 Gone`, wenn abgelaufen
+- Download ist streamingfähig (kein `readAllBytes` mehr)
 
 **Storage** (`backend/src/main/kotlin/app/storage/UploadStorage.kt`):
 
 - Upload-ID: URL-safe Base64 ohne Padding (24 random bytes)
-- Layout: `storage/uploads/<id>/chunks/*.part`, final `blob.enc`, `upload.json`, optional `manifest.enc.b64`
-- Chunk-Count wird beim Complete geprüft; Chunk-Inhalt/Integrität wird nicht validiert.
+- Layout: `storage/uploads/<id>/chunks/*.part` + `chunks/*.sha256`, plus `upload.json` + `manifest.enc.b64`
+- Chunk-Count/Indizes/Hashes werden beim Complete geprüft (Sidecar `.sha256` pro Chunk).
 
 **Config**:
 
@@ -87,8 +96,8 @@ Vite Proxy für API:
 **Download-Pipeline**:
 
 - `frontend/src/download/downloadAndDecrypt.ts`:
-  - lädt `/api/downloads/{uploadId}` komplett in RAM (`arrayBuffer()`)
-  - `decryptPayloadPlaceholder()` gibt aktuell **nur den Ciphertext als Blob** zurück (keine Entschlüsselung)
+  - verwendet `GET /api/v1/uploads/{uploadId}/status` und `GET /api/v1/uploads/{uploadId}/chunks/{index}`
+  - entschlüsselt chunkweise und kann Download-Fortsetzen (Best-Effort)
 
 **Worker**:
 
@@ -102,14 +111,15 @@ Funktional vorhanden:
 - Frontend: Key-Generierung/Export/Import (AES-GCM raw key base64url)
 - Frontend: Chunkweise AES-GCM Verschlüsselung (pro Chunk Nonce)
 - Link-Pattern `/d/<id>#key=<...>` und Client liest Key aus Fragment
+- Download: packed Chunks werden clientseitig entschlüsselt und als ZIP gespeichert (File System Access API + Blob-Fallback)
 
 Wichtige TODOs (laut Code + `docs/IMPLEMENTATION_PLAN.md`):
 
 - **Echtes ZIP-Streaming** statt `createZipPlaceholder()` (kein RAM-Alles-auf-einmal)
-- **Streaming Decrypt** passend zu Pack-Format und AAD-Policy
+- **True streaming Encrypt/Decrypt Pipelines** (aktuell korrekt, aber nicht voll stream-optimiert)
 - **Crypto Worker** verdrahten (UI nicht blockieren, Progress/Abort)
-- Backend: **Streaming Download** statt `Files.readAllBytes`, Expiry/Cleanup/Quotas/RateLimits
-- Frontend deps pinnen (statt `"latest"`) für reproduzierbare Builds
+- Backend: Persistente Limits/Quotas + robustes Abuse-Monitoring (aktuell in-memory), optional Auth
+- Manifest/Restore UX: Manifest erstellen/verschlüsseln und im Download verwenden (Dateiliste/Metadaten clientseitig)
 
 ## Nützliche Einstiegspunkte (Datei-Map)
 
@@ -121,4 +131,3 @@ Wichtige TODOs (laut Code + `docs/IMPLEMENTATION_PLAN.md`):
 - ZIP Platzhalter: `frontend/src/zip/zipStreamWriter.ts`
 - Download Flow: `frontend/src/views/DownloadView.vue`, `frontend/src/download/downloadAndDecrypt.ts`
 - Hintergrund/Planung: `docs/IMPLEMENTATION_PLAN.md`, `docs/THREAT_MODEL.md`, `docs/CRYPTO_NOTES.md`
-

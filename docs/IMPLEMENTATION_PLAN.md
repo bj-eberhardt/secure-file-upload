@@ -26,11 +26,11 @@ secure-upload/
 ### Endpunkte
 
 ```text
-POST /api/uploads/init
-PUT  /api/uploads/{id}/chunks/{index}
-POST /api/uploads/{id}/complete
-GET  /api/uploads/{id}/status
-GET  /api/downloads/{id}
+POST /api/v1/uploads/init
+PUT  /api/v1/uploads/{id}/chunks/{index}
+POST /api/v1/uploads/{id}/complete
+GET  /api/v1/uploads/{id}/status
+ 
 ```
 
 ### Server darf nur speichern
@@ -40,7 +40,6 @@ storage/uploads/<uploadId>/
 ├─ chunks/
 │  ├─ 00000000.part
 │  └─ 00000001.part
-├─ blob.enc
 ├─ manifest.enc.b64
 └─ upload.json
 ```
