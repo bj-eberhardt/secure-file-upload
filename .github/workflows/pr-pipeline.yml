@@ -44,6 +44,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload JaCoCo coverage report (HTML/XML)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-report
+          path: backend/build/reports/jacoco/**
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Create Micronaut test summary
         if: always()
         env:
@@ -57,15 +66,26 @@ jobs:
 
           const xmlDir = path.join('backend', 'build', 'test-results', 'test');
           const htmlDir = path.join('backend', 'build', 'reports', 'tests', 'test');
+          const jacocoHtml = path.join('backend', 'build', 'reports', 'jacoco', 'test', 'html', 'index.html');
+          const jacocoXml = path.join('backend', 'build', 'reports', 'jacoco', 'test', 'jacocoTestReport.xml');
 
           function listXmlFiles(dir) {
-            try {
-              return fs.readdirSync(dir)
-                .filter(f => f.endsWith('.xml'))
-                .map(f => path.join(dir, f));
-            } catch {
-              return [];
+            const out = [];
+            function walk(p) {
+              let entries = [];
+              try {
+                entries = fs.readdirSync(p, { withFileTypes: true });
+              } catch {
+                return;
+              }
+              for (const e of entries) {
+                const full = path.join(p, e.name);
+                if (e.isDirectory()) walk(full);
+                else if (e.isFile() && full.endsWith('.xml')) out.push(full);
+              }
             }
+            walk(dir);
+            return out;
           }
 
           function parseCountsFromXml(xml) {
@@ -97,19 +117,41 @@ jobs:
             ? 'Micronaut test HTML report was uploaded as artifact.'
             : 'No HTML test report found.';
 
+          let coverageNote = '';
+          if (fs.existsSync(jacocoHtml)) {
+            coverageNote = 'JaCoCo coverage report was uploaded as artifact.';
+            if (fs.existsSync(jacocoXml)) {
+              try {
+                const xml = fs.readFileSync(jacocoXml, 'utf8');
+                const matches = [...xml.matchAll(/<counter\\s+type=\"LINE\"\\s+missed=\"(\\d+)\"\\s+covered=\"(\\d+)\"\\s*\\/?>(?:<\\/counter>)?/g)];
+                const m = matches.length > 0 ? matches[matches.length - 1] : null;
+                if (m) {
+                  const missed = Number(m[1] || 0);
+                  const covered = Number(m[2] || 0);
+                  const totalLines = missed + covered;
+                  const pct = totalLines > 0 ? ((covered / totalLines) * 100).toFixed(1) : '0.0';
+                  coverageNote = `JaCoCo coverage report was uploaded as artifact. (Line coverage: ${pct}%)`;
+                }
+              } catch {
+              }
+            }
+          } else {
+            coverageNote = 'No JaCoCo report found.';
+          }
+
           const failed = (total.failures + total.errors) > 0;
           const status = xmlFiles.length === 0
             ? 'No XML results found.'
             : failed ? 'Tests failed.' : 'All tests passed.';
 
           const summary = [
-            `| Result | Count |`,
-            `|---|---:|`,
-            `| Passed | ${Math.max(0, total.tests - total.failures - total.errors - total.skipped)} |`,
-            `| Failed | ${total.failures + total.errors} |`,
-            `| Skipped | ${total.skipped} |`,
-            `| Total | ${total.tests} |`,
-          ].join('\\n');
+              `| Result | Count |`,
+              `|---|---:|`,
+              `| Passed | ${Math.max(0, total.tests - total.failures - total.errors - total.skipped)} |`,
+              `| Failed | ${total.failures + total.errors} |`,
+              `| Skipped | ${total.skipped} |`,
+              `| Total | ${total.tests} |`,
+          ].join('\n');
 
           const body = `<!-- micronaut-tests-comment -->
 
@@ -118,6 +160,8 @@ jobs:
           ${status}
 
           ${reportNote}
+
+          ${coverageNote}
 
           <details>
           <summary>Show results</summary>
@@ -136,6 +180,7 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         if: always() && github.event_name == 'pull_request'
         with:
+          header: micronaut-tests
           path: micronaut-pr-comment.md
 
       - name: Run end to end tests
@@ -233,6 +278,7 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         if: always() && github.event_name == 'pull_request'
         with:
+          header: playwright-e2e
           path: playwright-pr-comment.md
 
       - name: Fail job if Playwright failed
