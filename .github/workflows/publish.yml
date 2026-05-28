@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -92,4 +96,3 @@ jobs:
           body: ${{ steps.message.outputs.message }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
