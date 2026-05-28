@@ -90,13 +90,13 @@ jobs:
 
           function parseCountsFromXml(xml) {
             // Minimal parsing to avoid extra deps. Works for Gradle/JUnit XML.
-            const suiteTags = [...xml.matchAll(/<testsuite\\b[^>]*>/g)].map(m => m[0]);
+            const suiteTags = [...xml.matchAll(/<testsuite\b[^>]*>/g)].map(m => m[0]);
             let tests = 0, failures = 0, errors = 0, skipped = 0;
             for (const tag of suiteTags) {
-              const t = Number((tag.match(/\\btests=\"(\\d+)\"/) || [])[1] || 0);
-              const f = Number((tag.match(/\\bfailures=\"(\\d+)\"/) || [])[1] || 0);
-              const e = Number((tag.match(/\\berrors=\"(\\d+)\"/) || [])[1] || 0);
-              const s = Number((tag.match(/\\bskipped=\"(\\d+)\"/) || [])[1] || 0);
+              const t = Number((tag.match(/\btests="(\d+)"/) || [])[1] || 0);
+              const f = Number((tag.match(/\bfailures="(\d+)"/) || [])[1] || 0);
+              const e = Number((tag.match(/\berrors="(\d+)"/) || [])[1] || 0);
+              const s = Number((tag.match(/\bskipped="(\d+)"/) || [])[1] || 0);
               tests += t; failures += f; errors += e; skipped += s;
             }
             return { tests, failures, errors, skipped };
@@ -140,22 +140,23 @@ jobs:
           }
 
           const failed = (total.failures + total.errors) > 0;
+          const emoji = xmlFiles.length === 0 ? '⚠️' : failed ? '❌' : '✅';
           const status = xmlFiles.length === 0
             ? 'No XML results found.'
             : failed ? 'Tests failed.' : 'All tests passed.';
 
           const summary = [
-              `| Result | Count |`,
+              `| Ergebnis | Anzahl |`,
               `|---|---:|`,
-              `| Passed | ${Math.max(0, total.tests - total.failures - total.errors - total.skipped)} |`,
-              `| Failed | ${total.failures + total.errors} |`,
-              `| Skipped | ${total.skipped} |`,
-              `| Total | ${total.tests} |`,
+              `| ✅ Passed | ${Math.max(0, total.tests - total.failures - total.errors - total.skipped)} |`,
+              `| ❌ Failed | ${total.failures + total.errors} |`,
+              `| ⏭️ Skipped | ${total.skipped} |`,
+              `| Σ Total | ${total.tests} |`,
           ].join('\n');
 
           const body = `<!-- micronaut-tests-comment -->
 
-          ## Micronaut Tests
+          ## Micronaut Tests ${emoji}
 
           ${status}
 
@@ -215,11 +216,12 @@ jobs:
           const fs = require('fs');
           const runUrl = process.env.RUN_URL || '';
 
-          let summary = 'No JSON-testresults found.';
+          let summary = 'No JSON test results found.';
           let passed = 0;
           let failed = 0;
           let skipped = 0;
           let flaky = 0;
+          let emoji = '⚠️';
 
           if (fs.existsSync('frontend/test-results/.last-run.json')) {
             summary = 'Playwright HTML-report was uploaded as artifact.';
@@ -244,6 +246,7 @@ jobs:
             }
 
             walkSuites(data.suites || []);
+            emoji = failed > 0 ? '❌' : '✅';
 
             summary = [
               `| Ergebnis | Anzahl |`,
@@ -257,7 +260,7 @@ jobs:
 
           const body = `<!-- playwright-report-comment -->
 
-          ## 🎭 Playwright Test Report
+          ## 🎭 Playwright E2E ${emoji}
 
           <details>
           <summary>Show results</summary>
