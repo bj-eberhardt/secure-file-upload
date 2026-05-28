@@ -39,8 +39,7 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val initLimit = rateLimiter.checkInit(ip)
         if (!initLimit.allowed) {
-            return HttpResponse.status<InitUploadResponse>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", initLimit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = initLimit.retryAfterSeconds)
         }
         val requestedChunkSize = body.chunkSize ?: config.chunkSize
         val maxPlainChunkSize = (config.maxChunkBytes - packOverheadBytes).coerceAtLeast(1)
@@ -76,11 +75,10 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val limit = rateLimiter.checkUploadChunk(ip)
         if (!limit.allowed) {
-            return HttpResponse.status<Any>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", limit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = limit.retryAfterSeconds)
         }
-        val meta = storage.readMetaOrNull(id) ?: return HttpResponse.notFound()
-        if (storage.isExpired(id)) return HttpResponse.status(HttpStatus.GONE)
+        val meta = storage.readMetaOrNull(id) ?: throw UnknownUploadException()
+        if (storage.isExpired(id)) throw UploadExpiredException()
         if (meta.completed) throw UploadConflictException("Upload already completed")
         storage.writeChunk(id, index, body)
         return HttpResponse.noContent()
@@ -101,14 +99,13 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val limit = rateLimiter.checkDownloadChunk(ip)
         if (!limit.allowed) {
-            return HttpResponse.status<StreamedFile>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", limit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = limit.retryAfterSeconds)
         }
-        if (storage.isExpired(id)) return HttpResponse.status(HttpStatus.GONE)
-        val meta = storage.readMetaOrNull(id) ?: return HttpResponse.notFound()
-        if (!meta.completed) return HttpResponse.notFound()
+        if (storage.isExpired(id)) throw UploadExpiredException()
+        val meta = storage.readMetaOrNull(id) ?: throw UnknownUploadException()
+        if (!meta.completed) throw UnknownUploadException()
         val path = storage.chunkPath(id, index)
-        if (!Files.exists(path)) return HttpResponse.notFound()
+        if (!Files.exists(path)) throw NotFoundException("Chunk not found")
         storage.touchExpiry(id)
         val streamed = StreamedFile(Files.newInputStream(path), MediaType.APPLICATION_OCTET_STREAM_TYPE)
         return HttpResponse.ok(streamed)
@@ -129,8 +126,7 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val limit = rateLimiter.checkUploadChunk(ip)
         if (!limit.allowed) {
-            return HttpResponse.status<CompleteUploadResponse>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", limit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = limit.retryAfterSeconds)
         }
         val meta = storage.readMetaOrNull(id) ?: throw UnknownUploadException()
         if (storage.isExpired(id)) throw UploadExpiredException()
@@ -160,11 +156,10 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val limit = rateLimiter.checkDownload(ip)
         if (!limit.allowed) {
-            return HttpResponse.status<UploadStatusResponse>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", limit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = limit.retryAfterSeconds)
         }
-        val meta = storage.readMetaOrNull(id) ?: return HttpResponse.notFound()
-        if (storage.isExpired(id)) return HttpResponse.status(HttpStatus.GONE)
+        val meta = storage.readMetaOrNull(id) ?: throw UnknownUploadException()
+        if (storage.isExpired(id)) throw UploadExpiredException()
         val response = UploadStatusResponse(
             uploadId = id,
             completed = storage.isCompleted(id),
@@ -189,11 +184,10 @@ class UploadController(
         val ip = ipResolver.resolve(request)
         val limit = rateLimiter.checkDownload(ip)
         if (!limit.allowed) {
-            return HttpResponse.status<String>(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", limit.retryAfterSeconds.toString())
+            throw RateLimitedException(retryAfterSeconds = limit.retryAfterSeconds)
         }
-        if (storage.isExpired(id)) return HttpResponse.status(HttpStatus.GONE)
-        val manifest = storage.readEncryptedManifestOrNull(id) ?: return HttpResponse.notFound()
+        if (storage.isExpired(id)) throw UploadExpiredException()
+        val manifest = storage.readEncryptedManifestOrNull(id) ?: throw NotFoundException("Manifest not found")
         return HttpResponse.ok(manifest).contentType(MediaType.TEXT_PLAIN_TYPE)
     }
 }

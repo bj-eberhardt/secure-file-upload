@@ -86,7 +86,7 @@ test.describe('Download (basic)', () => {
         return calls?.[0]?.suggestedName ?? null
       })
       expect.soft(suggested).toBeTruthy()
-      expect(suggested).toBe(`secure-upload-${uploadId}.zip`)
+      expect(suggested).toBe(`secure-file-upload-${uploadId}.zip`)
     })
   })
 

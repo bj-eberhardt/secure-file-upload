@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/${GITHUB_OWNER:-local}/secure-upload:latest
+    image: ghcr.io/${GITHUB_OWNER:-local}/secure-file-upload:latest
     env_file: .env
     ports:
       - "11433:8080"

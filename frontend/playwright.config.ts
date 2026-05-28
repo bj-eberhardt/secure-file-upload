@@ -37,12 +37,12 @@ export default defineConfig({
       `${gradleCmd} :backend:run ` +
       `-Dmicronaut.environments=e2e ` +
       `-Dmicronaut.server.port=${port} ` +
-      `-Dsecure-upload.rate-limit-enabled=false ` +
-      `-Dsecure-upload.cleanup-enabled=false ` +
-      `-Dsecure-upload.chunk-size=262144 ` +
-      `-Dsecure-upload.min-chunk-bytes=262144 ` +
-      `-Dsecure-upload.max-chunk-bytes=1048576 ` +
-      `-Dsecure-upload.storage-dir=backend/build/e2e-uploads`,
+      `-Dsecure-file-upload.rate-limit-enabled=false ` +
+      `-Dsecure-file-upload.cleanup-enabled=false ` +
+      `-Dsecure-file-upload.chunk-size=262144 ` +
+      `-Dsecure-file-upload.min-chunk-bytes=262144 ` +
+      `-Dsecure-file-upload.max-chunk-bytes=1048576 ` +
+      `-Dsecure-file-upload.storage-dir=backend/build/e2e-uploads`,
     url: `http://localhost:${port}/health`,
     timeout: 180_000,
     reuseExistingServer: reuseExistingServer && !isCi,

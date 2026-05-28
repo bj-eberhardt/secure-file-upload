@@ -23,7 +23,8 @@ type WorkerRequest = WorkerUploadRequest | WorkerAbortRequest
 
 type WorkerProgress = {
   type: 'progress'
-  message: string
+  messageKey: string
+  messageParams?: Record<string, unknown>
   uploadedChunks: number
   totalChunks?: number
   percent?: number
@@ -39,7 +40,7 @@ type WorkerResult = {
     protocolVersion: string
   }
 }
-type WorkerError = { type: 'error'; message: string }
+type WorkerError = { type: 'error'; message: string; errorKey?: string }
 
 let abortController: AbortController | null = null
 let abortRequested = false
@@ -80,7 +81,6 @@ async function createZipReadableStream(files: File[]): Promise<ReadableStream<Ui
       try {
         await zipWriter.close()
       } catch {
-        // ignore
       }
     }
   })()
@@ -107,15 +107,15 @@ async function uploadEncrypted(
   const estimatedTotalBytes = files.reduce((sum, f) => sum + f.size, 0)
   let processedPlainBytes = 0
 
-  post({ type: 'progress', message: 'Erzeuge Manifest...', uploadedChunks: 0, detail: '' })
+  post({ type: 'progress', messageKey: 'upload.creatingManifest', uploadedChunks: 0, detail: '' })
   const plainManifest = createPlainManifest(files)
   const encryptedManifestObj = await encryptManifestV1(init.uploadId, init.protocolVersion, key, plainManifest)
   const encryptedManifest = JSON.stringify(encryptedManifestObj)
 
   if (files.length === 1) {
-    post({ type: 'progress', message: 'Lese Datei stream...', uploadedChunks: 0, detail: '' })
+    post({ type: 'progress', messageKey: 'upload.readingFileStream', uploadedChunks: 0, detail: '' })
   } else {
-    post({ type: 'progress', message: 'Erzeuge ZIP stream...', uploadedChunks: 0, detail: '' })
+    post({ type: 'progress', messageKey: 'upload.creatingZipStream', uploadedChunks: 0, detail: '' })
   }
   const uploadStream = files.length === 1 ? createSingleFileReadableStream(files[0]) : await createZipReadableStream(files)
   const reader = uploadStream.getReader()
@@ -136,7 +136,8 @@ async function uploadEncrypted(
         const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
         post({
           type: 'progress',
-          message: `Chunk ${index} bereits vorhanden (resume)`,
+          messageKey: 'upload.chunkAlreadyPresent',
+          messageParams: { chunk: index + 1 },
           uploadedChunks: index,
           percent,
           detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
@@ -155,15 +156,24 @@ async function uploadEncrypted(
       })
       if (!response.ok) {
         const retryAfter = response.headers.get('Retry-After')
-        if (response.status === 429 && retryAfter) throw new Error(`Rate limit: bitte in ${retryAfter}s erneut versuchen`)
-        throw new Error(`Chunk ${index} konnte nicht hochgeladen werden (HTTP ${response.status})`)
+        if (response.status === 429 && retryAfter) throw new Error(`RATE_LIMITED:${retryAfter}`)
+        let errorKey: string | undefined
+        let message = `Chunk upload failed (HTTP ${response.status})`
+        try {
+          const json: any = await response.json()
+          errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+          message = typeof json?.message === 'string' ? json.message : message
+        } catch {
+        }
+        throw Object.assign(new Error(message), { errorKey })
       }
       encryptedSize += packed.byteLength
       index++
       const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
       post({
         type: 'progress',
-        message: `Chunk ${index} hochgeladen`,
+        messageKey: 'progress.chunkUploaded',
+        messageParams: { chunk: index },
         uploadedChunks: index,
         percent,
         detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
@@ -190,15 +200,24 @@ async function uploadEncrypted(
       })
       if (!response.ok) {
         const retryAfter = response.headers.get('Retry-After')
-        if (response.status === 429 && retryAfter) throw new Error(`Rate limit: bitte in ${retryAfter}s erneut versuchen`)
-        throw new Error(`Chunk ${index} konnte nicht hochgeladen werden (HTTP ${response.status})`)
+        if (response.status === 429 && retryAfter) throw new Error(`RATE_LIMITED:${retryAfter}`)
+        let errorKey: string | undefined
+        let message = `Chunk upload failed (HTTP ${response.status})`
+        try {
+          const json: any = await response.json()
+          errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+          message = typeof json?.message === 'string' ? json.message : message
+        } catch {
+        }
+        throw Object.assign(new Error(message), { errorKey })
       }
       encryptedSize += packed.byteLength
       index++
       const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
       post({
         type: 'progress',
-        message: `Chunk ${index} hochgeladen`,
+        messageKey: 'progress.chunkUploaded',
+        messageParams: { chunk: index },
         uploadedChunks: index,
         percent,
         detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
@@ -208,7 +227,8 @@ async function uploadEncrypted(
       const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
       post({
         type: 'progress',
-        message: `Chunk ${index} bereits vorhanden (resume)`,
+        messageKey: 'upload.chunkAlreadyPresent',
+        messageParams: { chunk: index },
         uploadedChunks: index,
         percent,
         detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
@@ -216,7 +236,7 @@ async function uploadEncrypted(
     }
   }
 
-  post({ type: 'progress', message: 'Upload fertig, finalisiere...', uploadedChunks: index, percent: 100, detail: '' })
+  post({ type: 'progress', messageKey: 'upload.finalizing', uploadedChunks: index, percent: 100, detail: '' })
 
   return {
     chunkCount: index,
@@ -233,7 +253,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     abortRequested = true
     abortController?.abort()
     abortController = null
-    post({ type: 'error', message: 'Abgebrochen' })
+    post({ type: 'error', message: 'Aborted' })
     return
   }
 
@@ -242,7 +262,17 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     const result = await uploadEncrypted(apiBase, msg.init, msg.files, msg.keyRaw)
     post({ type: 'result', result })
   } catch (error) {
-    post({ type: 'error', message: error instanceof Error ? error.message : 'Unbekannter Fehler' })
+    if (error instanceof Error && error.message.startsWith('RATE_LIMITED:')) {
+      const retryAfterSeconds = error.message.split(':')[1] ?? ''
+      post({ type: 'error', errorKey: 'RATE_LIMITED', message: `Too many requests. Retry in ${retryAfterSeconds}s.` })
+      return
+    }
+    const errAny = error as any
+    post({
+      type: 'error',
+      errorKey: typeof errAny?.errorKey === 'string' ? errAny.errorKey : undefined,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    })
   }
 })
 

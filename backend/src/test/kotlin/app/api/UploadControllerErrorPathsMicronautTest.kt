@@ -31,16 +31,16 @@ class UploadControllerErrorPathsMicronautTest : TestPropertyProvider {
     @Inject
     lateinit var storage: UploadStorage
 
-    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-upload-errors-it")
+    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-file-upload-errors-it")
     private val mapper: ObjectMapper = ObjectMapper().findAndRegisterModules()
 
     override fun getProperties(): MutableMap<String, String> = mutableMapOf(
-        "secure-upload.storage-dir" to storageDir.toString(),
-        "secure-upload.rate-limit-enabled" to "false",
-        "secure-upload.cleanup-enabled" to "false",
-        "secure-upload.max-chunk-bytes" to "64",
-        "secure-upload.min-chunk-bytes" to "4",
-        "secure-upload.chunk-size" to "8"
+        "secure-file-upload.storage-dir" to storageDir.toString(),
+        "secure-file-upload.rate-limit-enabled" to "false",
+        "secure-file-upload.cleanup-enabled" to "false",
+        "secure-file-upload.max-chunk-bytes" to "64",
+        "secure-file-upload.min-chunk-bytes" to "4",
+        "secure-file-upload.chunk-size" to "8"
     )
 
     @AfterAll

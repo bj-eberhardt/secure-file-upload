@@ -26,15 +26,15 @@ class UploadControllerMicronautTest : TestPropertyProvider {
     @field:Client("/")
     lateinit var client: HttpClient
 
-    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-upload-it")
+    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-file-upload-it")
 
     override fun getProperties(): MutableMap<String, String> = mutableMapOf(
-        "secure-upload.storage-dir" to storageDir.toString(),
-        "secure-upload.rate-limit-enabled" to "false",
-        "secure-upload.cleanup-enabled" to "false",
-        "secure-upload.max-chunk-bytes" to (64L * 1024L).toString(), // small for tests
-        "secure-upload.min-chunk-bytes" to (1024L).toString(),
-        "secure-upload.chunk-size" to (8L * 1024L).toString()
+        "secure-file-upload.storage-dir" to storageDir.toString(),
+        "secure-file-upload.rate-limit-enabled" to "false",
+        "secure-file-upload.cleanup-enabled" to "false",
+        "secure-file-upload.max-chunk-bytes" to (64L * 1024L).toString(), // small for tests
+        "secure-file-upload.min-chunk-bytes" to (1024L).toString(),
+        "secure-file-upload.chunk-size" to (8L * 1024L).toString()
     )
 
     @AfterAll

@@ -1,25 +1,25 @@
 # Threat Model
 
-## Schutzziele
+## Security goals
 
-- Server darf Dateiinhalte nicht lesen können.
-- Server darf Dateinamen und Dateimetadaten nicht kennen.
-- Netzwerkangreifer dürfen Inhalte nicht lesen oder verändern können.
-- Falscher Schlüssel muss zu einem Authentifizierungsfehler führen.
+- The server must not be able to read file contents.
+- The server must not learn filenames or file metadata.
+- Network attackers must not be able to read or modify contents.
+- A wrong key must result in an authentication failure.
 
-## Nicht gelöst durch dieses Skeleton
+## Not solved by this skeleton
 
-- Kompromittierter Browser.
-- Bösartige Browser-Erweiterungen.
-- Manipuliertes Frontend JavaScript vom Server.
-- Traffic-Analyse anhand Uploadgröße und Zeitpunkt.
-- Schutz vor Linkweitergabe inklusive Fragment-Key.
+- A compromised browser.
+- Malicious browser extensions.
+- Server-delivered frontend JavaScript that was tampered with.
+- Traffic analysis based on upload size and timing.
+- Protection against link sharing including the fragment key.
 
-## Wichtige Maßnahmen
+## Important measures
 
-- HTTPS/HSTS erzwingen.
-- Subresource Integrity oder reproduzierbare Frontend-Builds prüfen.
-- CSP restriktiv setzen.
-- Keine externen Skripte laden.
-- Secrets nie in Logs.
-- Quotas und Rate Limits.
+- Enforce HTTPS/HSTS.
+- Consider Subresource Integrity or reproducible frontend builds.
+- Set a restrictive CSP.
+- Do not load external scripts.
+- Never log secrets.
+- Use quotas and rate limits.

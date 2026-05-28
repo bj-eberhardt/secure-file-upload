@@ -1,0 +1,115 @@
+name: PullRequest with E2E tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Build
+        id: build
+        run: ./gradlew buildAll --no-daemon --plain
+
+      - name: Run end to end tests
+        id: e2e
+        continue-on-error: true
+        run: ./gradlew :frontend:npmPlaywrightInstall && ./gradlew :frontend:npmE2e
+
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+
+      - name: Create Playwright summary
+        if: always()
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          let summary = 'No JSON-testresults found.';
+          let passed = 0;
+          let failed = 0;
+          let skipped = 0;
+          let flaky = 0;
+
+          if (fs.existsSync('test-results/.last-run.json')) {
+            summary = 'Playwright HTML-report was uploaded as artifact.';
+          }
+
+          if (fs.existsSync('test-results.json')) {
+            const data = JSON.parse(fs.readFileSync('test-results.json', 'utf8'));
+
+            function walkSuites(suites = []) {
+              for (const suite of suites) {
+                for (const spec of suite.specs || []) {
+                  for (const test of spec.tests || []) {
+                    const status = test.status;
+                    if (status === 'expected') passed++;
+                    else if (status === 'unexpected') failed++;
+                    else if (status === 'skipped') skipped++;
+                    else if (status === 'flaky') flaky++;
+                  }
+                }
+                walkSuites(suite.suites || []);
+              }
+            }
+
+            walkSuites(data.suites || []);
+
+            summary = [
+              `| Ergebnis | Anzahl |`,
+              `|---|---:|`,
+              `| ✅ Success | ${passed} |`,
+              `| ❌ Failed | ${failed} |`,
+              `| ⚠️ Flaky | ${flaky} |`,
+              `| ⏭️ Skipped | ${skipped} |`,
+            ].join('\n');
+          }
+
+          const body = `<!-- playwright-report-comment -->
+
+          ## 🎭 Playwright Test Report
+
+          <details>
+          <summary>Show results</summary>
+
+          ${summary}
+
+          </details>
+
+          The full html report can be downloaded at **artifacts → playwright-report**.
+          `;
+
+          fs.writeFileSync('playwright-pr-comment.md', body);
+          EOF
+
+      - name: Comment Playwright results on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: always() && github.event_name == 'pull_request'
+        with:
+          path: playwright-pr-comment.md
+
+      - name: Fail job if Playwright failed
+        if: steps.e2e.outcome == 'failure'
+        run: exit 1
+
+      - name: Build docker images
+        run: touch .env && docker compose build

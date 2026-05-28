@@ -73,7 +73,7 @@ fun forwardSystemProperties(vararg prefixes: String): Map<String, Any> {
 
 // Ensure `./gradlew :backend:run -D...` forwards selected system properties to the application JVM.
 tasks.named<JavaExec>("run") {
-    systemProperties(forwardSystemProperties("micronaut.", "secure-upload."))
+    systemProperties(forwardSystemProperties("micronaut.", "secure-file-upload."))
 }
 
 tasks.jacocoTestReport {
@@ -109,4 +109,11 @@ tasks.check {
 
 tasks.named("build") {
     dependsOn("shadowJar")
+}
+
+// `:frontend:copyFrontendToBackend` writes into `backend/src/main/resources/public`.
+// `inspectRuntimeClasspath` reads the backend resources; declare the dependency explicitly
+// to satisfy Gradle task dependency validation.
+tasks.matching { it.name == "inspectRuntimeClasspath" }.configureEach {
+    dependsOn(":frontend:copyFrontendToBackend")
 }

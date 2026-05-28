@@ -83,7 +83,6 @@ export function decryptPackedChunksStream(
       try {
         await reader.cancel(reason)
       } catch {
-        // ignore
       }
     }
   })

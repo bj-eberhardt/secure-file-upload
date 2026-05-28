@@ -24,12 +24,12 @@ class SecurityHeadersFilterDevMicronautTest : TestPropertyProvider {
     @field:Client("/")
     lateinit var client: HttpClient
 
-    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-upload-devheaders-it")
+    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-file-upload-devheaders-it")
 
     override fun getProperties(): MutableMap<String, String> = mutableMapOf(
-        "secure-upload.storage-dir" to storageDir.toString(),
-        "secure-upload.rate-limit-enabled" to "false",
-        "secure-upload.cleanup-enabled" to "false"
+        "secure-file-upload.storage-dir" to storageDir.toString(),
+        "secure-file-upload.rate-limit-enabled" to "false",
+        "secure-file-upload.cleanup-enabled" to "false"
     )
 
     @AfterAll

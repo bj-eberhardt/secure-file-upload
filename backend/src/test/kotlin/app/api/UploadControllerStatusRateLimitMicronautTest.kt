@@ -24,17 +24,17 @@ class UploadControllerStatusRateLimitMicronautTest : TestPropertyProvider {
     @field:Client("/")
     lateinit var client: HttpClient
 
-    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-upload-statusrl-it")
+    private val storageDir: Path = TestStorageDirs.createTempStorageDir("secure-file-upload-statusrl-it")
 
     override fun getProperties(): MutableMap<String, String> = mutableMapOf(
-        "secure-upload.storage-dir" to storageDir.toString(),
-        "secure-upload.cleanup-enabled" to "false",
-        "secure-upload.rate-limit-enabled" to "true",
-        "secure-upload.download-requests-per-minute" to "1",
-        "secure-upload.init-requests-per-minute" to "9999",
-        "secure-upload.upload-chunk-requests-per-minute" to "9999",
-        "secure-upload.download-chunk-requests-per-minute" to "9999",
-        "secure-upload.max-active-uploads-per-ip" to "999"
+        "secure-file-upload.storage-dir" to storageDir.toString(),
+        "secure-file-upload.cleanup-enabled" to "false",
+        "secure-file-upload.rate-limit-enabled" to "true",
+        "secure-file-upload.download-requests-per-minute" to "1",
+        "secure-file-upload.init-requests-per-minute" to "9999",
+        "secure-file-upload.upload-chunk-requests-per-minute" to "9999",
+        "secure-file-upload.download-chunk-requests-per-minute" to "9999",
+        "secure-file-upload.max-active-uploads-per-ip" to "999"
     )
 
     @AfterAll

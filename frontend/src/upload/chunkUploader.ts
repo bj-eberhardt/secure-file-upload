@@ -2,6 +2,7 @@ import { encryptChunk, packEncryptedChunk } from '../crypto/encryptStream'
 import { createPlainManifest, encryptManifestV1 } from '../crypto/manifest'
 import { createZipBlob } from '../zip/zipStreamWriter'
 import { apiBase, API_PREFIX } from '../api/apiConfig'
+import { t } from '../i18n'
 
 export interface InitUploadResponse {
   uploadId: string
@@ -28,17 +29,22 @@ export async function initUpload(): Promise<InitUploadResponse> {
   if (!response.ok) {
     const retryAfter = response.headers.get('Retry-After')
     if (response.status === 429 && retryAfter) {
-      throw new Error(`Rate limit: bitte in ${retryAfter}s erneut versuchen`)
+      const err = new Error(t('errors.RATE_LIMITED')) as any
+      err.errorKey = 'RATE_LIMITED'
+      err.retryAfterSeconds = retryAfter
+      throw err
     }
-    if (response.status === 410) throw new Error('Upload ist abgelaufen (bitte neu starten)')
+    let errorKey: string | undefined
     let detail = ''
     try {
       const json: any = await response.json()
+      errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
       detail = typeof json?.message === 'string' ? json.message : ''
     } catch {
-      // ignore
     }
-    throw new Error(detail ? `Upload konnte nicht initialisiert werden: ${detail}` : 'Upload konnte nicht initialisiert werden')
+    const err = new Error(errorKey ? t(`errors.${errorKey}`) : detail || t('common.unknownError')) as any
+    if (errorKey) err.errorKey = errorKey
+    throw err
   }
   return response.json()
 }
@@ -70,12 +76,24 @@ export async function uploadEncryptedChunks(
       headers: { 'Content-Type': 'application/octet-stream' },
       body: packed
     })
-    if (!response.ok) throw new Error(`Chunk ${index} konnte nicht hochgeladen werden`)
+    if (!response.ok) {
+      let errorKey: string | undefined
+      let detail = ''
+      try {
+        const json: any = await response.json()
+        errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+        detail = typeof json?.message === 'string' ? json.message : ''
+      } catch {
+      }
+      const err = new Error(errorKey ? t(`errors.${errorKey}`) : detail || t('common.unknownError')) as any
+      if (errorKey) err.errorKey = errorKey
+      throw err
+    }
 
     encryptedSize += packed.byteLength
     offset += init.chunkSize
     index++
-    onProgress(`Chunk ${index} hochgeladen`)
+    onProgress(t('progress.chunkUploaded', { chunk: index }))
   }
 
   return { chunkCount: index, encryptedSize, encryptedManifest, chunkSize: init.chunkSize, protocolVersion: init.protocolVersion }
@@ -87,6 +105,18 @@ export async function completeUpload(uploadId: string, result: UploadEncryptedRe
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(result)
   })
-  if (!response.ok) throw new Error('Upload konnte nicht abgeschlossen werden')
+  if (!response.ok) {
+    let errorKey: string | undefined
+    let detail = ''
+    try {
+      const json: any = await response.json()
+      errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+      detail = typeof json?.message === 'string' ? json.message : ''
+    } catch {
+    }
+    const err = new Error(errorKey ? t(`errors.${errorKey}`) : detail || t('common.unknownError')) as any
+    if (errorKey) err.errorKey = errorKey
+    throw err
+  }
   return response.json()
 }

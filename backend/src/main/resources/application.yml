@@ -1,6 +1,6 @@
 micronaut:
   application:
-    name: secure-upload
+    name: secure-file-upload
   server:
     port: 8080
     max-request-size: 64MB
@@ -45,7 +45,7 @@ endpoints:
 jackson:
   serializationInclusion: ALWAYS
 
-secure-upload:
+secure-file-upload:
   storage-dir: storage/uploads
   chunk-size: 8388608
   min-chunk-bytes: 1048576

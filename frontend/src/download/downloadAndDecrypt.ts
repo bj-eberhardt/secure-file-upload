@@ -2,6 +2,7 @@ import { decryptChunk, unpackEncryptedChunk } from '../crypto/decryptStream'
 import type { PlainManifest } from '../crypto/manifest'
 import { deleteDownloadResume, getDownloadResume, putDownloadResume, type DownloadResumeEntry } from './resumeStore'
 import { apiBase, API_PREFIX } from '../api/apiConfig'
+import { t } from '../i18n'
 
 interface UploadStatusResponse {
   uploadId: string
@@ -16,8 +17,19 @@ interface UploadStatusResponse {
 
 async function fetchUploadStatus(uploadId: string): Promise<UploadStatusResponse> {
   const response = await fetch(`${apiBase}${API_PREFIX}/uploads/${uploadId}/status`)
-  if (response.status === 410) throw new Error('Upload ist abgelaufen')
-  if (!response.ok) throw new Error('Status konnte nicht geladen werden')
+  if (!response.ok) {
+    let errorKey: string | undefined
+    let message = ''
+    try {
+      const json: any = await response.json()
+      errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+      message = typeof json?.message === 'string' ? json.message : ''
+    } catch {
+    }
+    const err = new Error(errorKey ? t(`errors.${errorKey}`) : message || t('common.unknownError')) as any
+    if (errorKey) err.errorKey = errorKey
+    throw err
+  }
   return response.json()
 }
 
@@ -38,7 +50,7 @@ async function saveStreamToFileSystemAccess(
     handle = await picker(pickerOptions)
   } catch (error) {
     const name = (error as any)?.name
-    if (name === 'AbortError') throw new Error('Speichern abgebrochen')
+    if (name === 'AbortError') throw new Error(t('download.saveAborted'))
     throw error
   }
   const writable = await handle.createWritable()
@@ -55,14 +67,12 @@ async function saveStreamToFileSystemAccess(
     try {
       await writable.abort()
     } catch {
-      // ignore
     }
     throw error
   } finally {
     try {
       await reader.cancel()
     } catch {
-      // ignore
     }
   }
 }
@@ -94,22 +104,40 @@ async function fetchChunkBytes(
   let attempt = 0
   while (true) {
     const response = await fetch(`${apiBase}${API_PREFIX}/uploads/${uploadId}/chunks/${index}`)
-    if (response.status === 410) throw new Error('Upload ist abgelaufen')
+    if (response.status === 410) {
+      const err = new Error(t('errors.UPLOAD_EXPIRED')) as any
+      err.errorKey = 'UPLOAD_EXPIRED'
+      throw err
+    }
     if (response.status === 429) {
       const retryAfter = response.headers.get('Retry-After')
       const seconds = retryAfter ? Number.parseInt(retryAfter, 10) : NaN
       const waitMs = Number.isFinite(seconds) ? Math.max(250, seconds * 1000) : 750
       if (Number.isFinite(seconds) && onRateLimitWait) {
-        onRateLimitWait(seconds, `Rate limit – warte ${seconds}s… (Chunk ${index})`)
+        onRateLimitWait(seconds, t('rateLimit.waiting', { seconds, chunk: index }))
       } else if (onRateLimitWait) {
-        onRateLimitWait(Math.ceil(waitMs / 1000), `Rate limit – warte kurz… (Chunk ${index})`)
+        onRateLimitWait(Math.ceil(waitMs / 1000), t('rateLimit.waitingBrief', { chunk: index }))
       }
       await new Promise((r) => setTimeout(r, waitMs))
       attempt++
       if (attempt < 30) continue
-      throw new Error(`Rate limit beim Download (Chunk ${index})`)
+      const err = new Error(t('rateLimit.failed', { chunk: index })) as any
+      err.errorKey = 'RATE_LIMITED'
+      throw err
     }
-    if (!response.ok) throw new Error(`Chunk ${index} download fehlgeschlagen (HTTP ${response.status})`)
+    if (!response.ok) {
+      let errorKey: string | undefined
+      let message = `Chunk download failed (HTTP ${response.status})`
+      try {
+        const json: any = await response.json()
+        errorKey = typeof json?.errorKey === 'string' ? json.errorKey : undefined
+        message = typeof json?.message === 'string' ? json.message : message
+      } catch {
+      }
+      const err = new Error(errorKey ? t(`errors.${errorKey}`) : message) as any
+      if (errorKey) err.errorKey = errorKey
+      throw err
+    }
     return new Uint8Array(await response.arrayBuffer())
   }
 }
@@ -122,7 +150,7 @@ async function decryptByFetchingChunks(
 ): Promise<ReadableStream<Uint8Array>> {
   const chunkCount = status.chunkCount
   if (typeof chunkCount !== 'number' || chunkCount <= 0) {
-    throw new Error('Download kann nicht resümieren: chunkCount fehlt')
+    throw new Error(t('downloadErrors.resumeMissingChunkCount'))
   }
   const protocolVersion = status.protocolVersion
 
@@ -210,7 +238,6 @@ export async function downloadAndDecryptWithManifest(
   try {
     ;(window as any).__pw_lastDownloadName = suggestedName
   } catch {
-    // ignore
   }
 
   const resumable = await downloadAndDecryptResumable(
@@ -270,7 +297,7 @@ async function downloadAndDecryptResumable(
         handle = (await picker({ suggestedName })) as FileSystemFileHandle
       } catch (error) {
         const name = (error as any)?.name
-        if (name === 'AbortError') throw new Error('Speichern abgebrochen')
+        if (name === 'AbortError') throw new Error(t('download.saveAborted'))
         throw error
       }
     }
@@ -301,10 +328,10 @@ async function downloadAndDecryptResumable(
     const perm = await (entry.handle as any).queryPermission?.({ mode: 'readwrite' })
     if (perm !== 'granted') {
       const req = await (entry.handle as any).requestPermission?.({ mode: 'readwrite' })
-      if (req !== 'granted') throw new Error('Keine Berechtigung zum Schreiben der Zieldatei')
+      if (req !== 'granted') throw new Error(t('downloadErrors.noWritePermission'))
     }
   } catch (error) {
-    throw error instanceof Error ? error : new Error('Keine Berechtigung zum Schreiben der Zieldatei')
+    throw error instanceof Error ? error : new Error(t('downloadErrors.noWritePermission'))
   }
 
   const resuming = entry.nextChunkIndex > 0 || entry.bytesWritten > 0
@@ -313,11 +340,11 @@ async function downloadAndDecryptResumable(
       const file = await entry.handle.getFile()
       if (file.size !== entry.bytesWritten) {
         await deleteDownloadResume(uploadId)
-        throw new Error('Fortsetzen ist nicht möglich: Zieldatei passt nicht mehr (bitte "Neu starten")')
+        throw new Error(t('downloadErrors.resumeTargetMismatch'))
       }
     } catch (error) {
       if (error instanceof Error) throw error
-      throw new Error('Fortsetzen ist nicht möglich: Zieldatei kann nicht geprüft werden (bitte "Neu starten")')
+      throw new Error(t('downloadErrors.resumeTargetCannotCheck'))
     }
   }
 
@@ -326,7 +353,10 @@ async function downloadAndDecryptResumable(
 
   try {
     if (onProgress) {
-      onProgress(Math.min(100, (entry.nextChunkIndex / chunkCount) * 100), `Chunk ${entry.nextChunkIndex} / ${chunkCount}`)
+      onProgress(
+        Math.min(100, (entry.nextChunkIndex / chunkCount) * 100),
+        t('downloadProgress.chunkOf', { chunk: entry.nextChunkIndex, total: chunkCount })
+      )
     }
     while (entry.nextChunkIndex < chunkCount) {
       const index = entry.nextChunkIndex
@@ -345,10 +375,12 @@ async function downloadAndDecryptResumable(
       try {
         await putDownloadResume(entry)
       } catch {
-        // ignore
       }
       if (onProgress) {
-        onProgress(Math.min(100, (entry.nextChunkIndex / chunkCount) * 100), `Chunk ${entry.nextChunkIndex} / ${chunkCount}`)
+        onProgress(
+          Math.min(100, (entry.nextChunkIndex / chunkCount) * 100),
+          t('downloadProgress.chunkOf', { chunk: entry.nextChunkIndex, total: chunkCount })
+        )
       }
     }
 
@@ -356,7 +388,6 @@ async function downloadAndDecryptResumable(
     try {
       await deleteDownloadResume(uploadId)
     } catch {
-      // ignore
     }
     return true
   } catch (error) {
@@ -364,7 +395,6 @@ async function downloadAndDecryptResumable(
       // close commits partial progress; abort would discard written data in many browsers
       await writable.close()
     } catch {
-      // ignore
     }
     // keep resume entry for later retry
     throw error

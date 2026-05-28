@@ -1,4 +1,4 @@
-secure-upload:
+secure-file-upload:
   rate-limit-enabled: false
   cleanup-enabled: false
 

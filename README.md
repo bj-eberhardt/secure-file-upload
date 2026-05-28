@@ -1,8 +1,8 @@
 # Secure Upload Skeleton
 
-Micronaut + Kotlin Backend mit Vue/Vite/TypeScript Frontend für clientseitig verschlüsselte Datei-Uploads.
+Micronaut + Kotlin backend with a Vue/Vite/TypeScript frontend for client-side encrypted file uploads.
 
-## Start lokal
+## Local development
 
 ```bash
 ./gradlew :backend:run
@@ -14,98 +14,92 @@ Backend: http://localhost:8080
 
 ## API (Swagger / OpenAPI)
 
-Das Backend generiert zur Build-Zeit eine OpenAPI-Spezifikation (micronaut-openapi KSP) und stellt eine interaktive Swagger UI bereit via Webjar (keine zusätzliche Controller-Weiterleitung nötig).
+The backend generates an OpenAPI specification at build time (micronaut-openapi KSP) and serves an interactive Swagger UI via WebJar (no additional controller forwarding required).
 
-- Backend starten:
+- Start the backend:
 
 ```bash
 ./gradlew :backend:run
 ```
 
-- Swagger UI (Dev): http://localhost:8080/webjars/swagger-ui/<version>/index.html?url=/swagger/openapi.yml
-- Alternativer (eingängiger) Link zur UI: http://localhost:8080/swagger-ui#/default
+- Swagger UI (dev): http://localhost:8080/webjars/swagger-ui/<version>/index.html?url=/swagger/openapi.yml
+- Alternative (short) link: http://localhost:8080/swagger-ui#/default
 
-Hinweis: Die verwendete Swagger UI-Version wird im Version Catalog (`gradle/libs.versions.toml`) verwaltet (Schlüssel `swaggerUi`). Ersetze `<version>` durch die dort definierte Version oder nutze die kurze URL `http://localhost:8080/webjars/swagger-ui/index.html?url=/swagger/openapi.yml`, die in vielen Setups automatisch zur installierten Webjar-Version aufgelöst wird.
+Note: The Swagger UI version is managed in the version catalog (`gradle/libs.versions.toml`, key `swaggerUi`). Replace `<version>` with that value, or use `http://localhost:8080/webjars/swagger-ui/index.html?url=/swagger/openapi.yml`, which is resolved to the installed WebJar version in many setups.
 
-## Komplett bauen
+## Full build
 
 ```bash
 ./gradlew buildAll
 ```
 
-Das Frontend wird gebaut und nach `backend/src/main/resources/public` kopiert, damit Micronaut es statisch ausliefert.
+The frontend is built and copied to `backend/src/main/resources/public` so Micronaut can serve it as static content.
 
-Hinweis (Windows): falls `buildAll` beim Node-Setup mit "unable to delete node.exe" fehlschlägt, stelle sicher, dass kein
-Gradle/Node/Vite-Prozess mehr läuft (Dev-Server stoppen) und versuche erneut.
+Note (Windows): if `buildAll` fails during Node setup with "unable to delete node.exe", make sure no Gradle/Node/Vite process is still running (stop the dev server) and try again.
 
 ## E2E (Playwright)
 
-Browser (Chromium) installieren:
+Install browser (Chromium):
 
 ```bash
 ./gradlew :frontend:npmPlaywrightInstall
 ```
 
-Die Gradle-Tasks nutzen standardmäßig Playwright-Chromium (und ignorieren ein ggf. global gesetztes `PW_CHANNEL`), damit E2E-Läufe deterministisch sind.
-Wenn du stattdessen einen lokal installierten Browser nutzen willst, starte Playwright direkt im `frontend/` Ordner, z.B. `PW_CHANNEL=chrome npm run test:e2e` (oder `msedge`).
+The Gradle tasks use Playwright Chromium by default (and ignore any globally set `PW_CHANNEL`) to keep E2E runs deterministic. If you want to use a locally installed browser instead, run Playwright directly in `frontend/`, e.g. `PW_CHANNEL=chrome npm run test:e2e` (or `msedge`).
 
-E2E-Tests laufen lassen (prod-like: Frontend build + copy, dann Backend als Webserver):
+Run E2E tests (prod-like: build + copy frontend, then run backend as web server):
 
 ```bash
 ./gradlew :frontend:npmE2e
 ```
 
-Hinweis: Für deterministische E2E-Läufe startet Playwright standardmäßig ein eigenes Backend mit E2E-Config (kleine Chunk-Size etc.) auf Port `18080`
-(damit es nicht mit einem Dev-Backend auf `8080` kollidiert). Wenn du einen anderen Port willst: `PW_PORT=18081 ./gradlew :frontend:npmE2e`.
-Wenn du bewusst einen bereits laufenden Server wiederverwenden willst (z.B. beim Entwickeln einzelner Tests), setze `PW_REUSE_SERVER=true`.
+Note: For deterministic E2E runs, Playwright starts its own backend with an E2E config (smaller chunk size, etc.) on port `18080` (so it does not collide with a dev backend on `8080`). To use a different port: `PW_PORT=18081 ./gradlew :frontend:npmE2e`. If you intentionally want to reuse an already running server (e.g. when developing individual tests), set `PW_REUSE_SERVER=true`.
 
-Hinweis (Windows/Sandbox): Falls Playwright mit einem EPERM-Fehler beim Schreiben nach `%LOCALAPPDATA%\\ms-playwright` abbricht,
-stellt das Projekt `PLAYWRIGHT_BROWSERS_PATH=0` ein, damit Browser lokal im Projekt abgelegt werden.
+Note (Windows/Sandbox): if Playwright fails with an EPERM error when writing to `%LOCALAPPDATA%\\ms-playwright`, this project sets `PLAYWRIGHT_BROWSERS_PATH=0` so browsers are stored locally in the project.
 
 Report: `frontend/playwright-report/`
 
-## Bauplan
+## Docs
 
-Siehe `docs/IMPLEMENTATION_PLAN.md`.
+- Threat model: `docs/THREAT_MODEL.md`
+- Crypto notes: `docs/CRYPTO_NOTES.md`
 
-## Konfiguration (Backend + E2E)
+## Configuration (Backend + E2E)
 
-Das Backend wird über Micronaut-Config gesteuert. Du kannst Werte entweder als **System Properties** (`-D...`) oder als **Environment Variables** setzen.
+The backend is configured via Micronaut config. You can set values either as **system properties** (`-D...`) or as **environment variables**.
 
-**Wichtig:** Micronaut mappt Properties auf Env Vars mit `_` statt `-` und in UPPERCASE (z.B. `secure-upload.storage-dir` → `SECURE_UPLOAD_STORAGE_DIR`).
+Important: Micronaut maps properties to env vars using `_` instead of `-` and in uppercase (e.g. `secure-file-upload.storage-dir` -> `SECURE_FILE_UPLOAD_STORAGE_DIR`).
 
 **Backend (Micronaut)**
-- `micronaut.environments` → `MICRONAUT_ENVIRONMENTS` (z.B. `e2e`)
-- `micronaut.server.port` → `MICRONAUT_SERVER_PORT` (Default: `8080`)
+- `micronaut.environments` -> `MICRONAUT_ENVIRONMENTS` (e.g. `e2e`)
+- `micronaut.server.port` -> `MICRONAUT_SERVER_PORT` (Default: `8080`)
 
-**secure-upload Settings**
-- `secure-upload.storage-dir` → `SECURE_UPLOAD_STORAGE_DIR` (Default: `storage/uploads`; Docker/Compose empfohlen: `/data/uploads` + Volume-Mount)
-- `secure-upload.protocol-version` → `SECURE_UPLOAD_PROTOCOL_VERSION` (Default: `v1`)
-- `secure-upload.chunk-size` → `SECURE_UPLOAD_CHUNK_SIZE` (Plaintext Chunk Size, Default: `8388608`)
-- `secure-upload.min-chunk-bytes` → `SECURE_UPLOAD_MIN_CHUNK_BYTES` (Default: `1048576`)
-- `secure-upload.max-chunk-bytes` → `SECURE_UPLOAD_MAX_CHUNK_BYTES` (Max Packed Request Size, Default: `67108864`)
-- `secure-upload.default-expiry-hours` → `SECURE_UPLOAD_DEFAULT_EXPIRY_HOURS` (Default: `72`)
-- `secure-upload.max-expiry-hours` → `SECURE_UPLOAD_MAX_EXPIRY_HOURS` (Default: `168`)
-- `secure-upload.trust-proxy-headers` → `SECURE_UPLOAD_TRUST_PROXY_HEADERS` (Default: `false`)
-- `secure-upload.rate-limit-enabled` → `SECURE_UPLOAD_RATE_LIMIT_ENABLED` (Default: `true`)
-- `secure-upload.max-active-uploads-per-ip` → `SECURE_UPLOAD_MAX_ACTIVE_UPLOADS_PER_IP` (Default: `5`)
-- `secure-upload.init-requests-per-minute` → `SECURE_UPLOAD_INIT_REQUESTS_PER_MINUTE` (Default: `30`)
-- `secure-upload.download-requests-per-minute` → `SECURE_UPLOAD_DOWNLOAD_REQUESTS_PER_MINUTE` (Default: `60`)
-- `secure-upload.download-chunk-requests-per-minute` → `SECURE_UPLOAD_DOWNLOAD_CHUNK_REQUESTS_PER_MINUTE` (Default: `600`)
-- `secure-upload.upload-chunk-requests-per-minute` → `SECURE_UPLOAD_UPLOAD_CHUNK_REQUESTS_PER_MINUTE` (Default: `600`)
-- `secure-upload.cleanup-enabled` → `SECURE_UPLOAD_CLEANUP_ENABLED` (Default: `true`)
-- `secure-upload.cleanup-interval-minutes` → `SECURE_UPLOAD_CLEANUP_INTERVAL_MINUTES` (Default: `15`)
+**secure-file-upload settings**
+- `secure-file-upload.storage-dir` -> `SECURE_FILE_UPLOAD_STORAGE_DIR` (Default: `storage/uploads`; Docker/Compose recommended: `/data/uploads` + volume mount)
+- `secure-file-upload.protocol-version` -> `SECURE_FILE_UPLOAD_PROTOCOL_VERSION` (Default: `v1`)
+- `secure-file-upload.chunk-size` -> `SECURE_FILE_UPLOAD_CHUNK_SIZE` (Plaintext chunk size, Default: `8388608`)
+- `secure-file-upload.min-chunk-bytes` -> `SECURE_FILE_UPLOAD_MIN_CHUNK_BYTES` (Default: `1048576`)
+- `secure-file-upload.max-chunk-bytes` -> `SECURE_FILE_UPLOAD_MAX_CHUNK_BYTES` (Max packed request size, Default: `67108864`)
+- `secure-file-upload.default-expiry-hours` -> `SECURE_FILE_UPLOAD_DEFAULT_EXPIRY_HOURS` (Default: `72`)
+- `secure-file-upload.max-expiry-hours` -> `SECURE_FILE_UPLOAD_MAX_EXPIRY_HOURS` (Default: `168`)
+- `secure-file-upload.trust-proxy-headers` -> `SECURE_FILE_UPLOAD_TRUST_PROXY_HEADERS` (Default: `false`)
+- `secure-file-upload.rate-limit-enabled` -> `SECURE_FILE_UPLOAD_RATE_LIMIT_ENABLED` (Default: `true`)
+- `secure-file-upload.max-active-uploads-per-ip` -> `SECURE_FILE_UPLOAD_MAX_ACTIVE_UPLOADS_PER_IP` (Default: `5`)
+- `secure-file-upload.init-requests-per-minute` -> `SECURE_FILE_UPLOAD_INIT_REQUESTS_PER_MINUTE` (Default: `30`)
+- `secure-file-upload.download-requests-per-minute` -> `SECURE_FILE_UPLOAD_DOWNLOAD_REQUESTS_PER_MINUTE` (Default: `60`)
+- `secure-file-upload.download-chunk-requests-per-minute` -> `SECURE_FILE_UPLOAD_DOWNLOAD_CHUNK_REQUESTS_PER_MINUTE` (Default: `600`)
+- `secure-file-upload.upload-chunk-requests-per-minute` -> `SECURE_FILE_UPLOAD_UPLOAD_CHUNK_REQUESTS_PER_MINUTE` (Default: `600`)
+- `secure-file-upload.cleanup-enabled` -> `SECURE_FILE_UPLOAD_CLEANUP_ENABLED` (Default: `true`)
+- `secure-file-upload.cleanup-interval-minutes` -> `SECURE_FILE_UPLOAD_CLEANUP_INTERVAL_MINUTES` (Default: `15`)
 
 **E2E (Playwright)**
-- `PW_PORT` (Default: `18080`) – Port, auf dem Playwright das Backend startet und gegen das getestet wird
-- `PW_REUSE_SERVER=true` – bereits laufenden Server wiederverwenden (sonst startet Playwright ein eigenes Backend mit E2E-Config)
-- `PW_CHANNEL=chrome|msedge` – optional lokal installierten Browser verwenden (Gradle-Tasks überschreiben das standardmäßig, für deterministische Runs)
-
-
+- `PW_PORT` (Default: `18080`) - port used for the backend Playwright starts and tests against
+- `PW_REUSE_SERVER=true` - reuse an already running server (otherwise Playwright starts its own backend with E2E config)
+- `PW_CHANNEL=chrome|msedge` - optionally use a locally installed browser (Gradle tasks override this by default for deterministic runs)
 
 ## Docker build
 
-Standard (Compose)
+Default (Compose)
 
 ```bash
 cp .env.example .env
@@ -115,8 +109,9 @@ docker compose up -d
 
 App: http://localhost:11433
 
-Stoppen / Aufräumen
+Stop / cleanup
+
 ```bash
 docker compose down
-docker compose down -v  # löscht auch named volumes (uploads + pgdata)
+docker compose down -v  # also deletes named volumes (uploads)
 ```

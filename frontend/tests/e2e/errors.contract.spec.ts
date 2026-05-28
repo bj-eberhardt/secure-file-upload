@@ -13,7 +13,7 @@ test.describe('Error contract (mocked)', () => {
         page,
         /\/api\/v1\/uploads\/init$/,
         429,
-        { message: 'Too Many Requests' },
+        { errorKey: 'RATE_LIMITED', message: 'Too Many Requests' },
         { 'Retry-After': '1' }
       )
     })
@@ -101,6 +101,12 @@ test.describe('Error contract (mocked)', () => {
   })
 
   test('save dialog abort shows a german error message', async ({ downloadPage, page }) => {
+    await given('the UI locale is forced to German', async () => {
+      await page.addInitScript(() => {
+        localStorage.setItem('secure-file-upload:locale', 'de')
+      })
+    })
+
     await given('save file picker aborts', async () => {
       await installFakeSaveFilePicker(page, { abort: true })
     })

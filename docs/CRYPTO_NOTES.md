@@ -2,10 +2,10 @@
 
 ## Version 1
 
-- AES-256-GCM über WebCrypto.
-- Ein zufälliger Root-Key pro Upload.
-- Ein Nonce pro Chunk.
-- AAD enthält Upload-ID, Chunk-Index und Protokollversion.
+- AES-256-GCM via WebCrypto.
+- One random root key per upload.
+- One nonce per chunk.
+- AAD contains upload ID, chunk index, and protocol version.
 
 ## Key Link
 
@@ -13,8 +13,8 @@
 /d/<uploadId>#key=<base64url-raw-key>
 ```
 
-Das Fragment wird nicht an den Server übertragen.
+The fragment is not transmitted to the server.
 
 ## Post-Quantum
 
-PQC sollte später als Key-Wrapping-/Key-Agreement-Layer ergänzt werden. Große Datei-Inhalte werden weiterhin symmetrisch verschlüsselt.
+PQC should later be added as a key-wrapping / key-agreement layer. Large file contents remain symmetrically encrypted.

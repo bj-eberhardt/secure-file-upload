@@ -14,5 +14,5 @@ pluginManagement {
 }
 
 
-rootProject.name = "secure-upload"
+rootProject.name = "secure-file-upload"
 include("backend", "frontend")

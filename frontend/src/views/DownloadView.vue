@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { importShareKey } from '../crypto/keyDerivation'
 import { downloadAndDecryptWithManifest } from '../download/downloadAndDecrypt'
 import type { PlainManifest } from '../crypto/manifest'
@@ -12,7 +13,8 @@ import { API_PREFIX } from '../api/apiConfig'
 
 type UiState = 'idle' | 'running' | 'success' | 'error'
 const uiState = ref<UiState>('idle')
-const uiMessage = ref('Bereit zum Download')
+const { t } = useI18n()
+const uiMessage = ref(t('download.ready'))
 const busy = ref(false)
 const manifest = ref<PlainManifest | null>(null)
 const canResume = ref(false)
@@ -49,7 +51,7 @@ async function refreshResumeState(uploadId: string) {
     const resume = await getDownloadResume(uploadId)
     canResume.value = !!resume && resume.nextChunkIndex > 0
     resumeNextChunkIndex.value = resume ? resume.nextChunkIndex : null
-    resumeDetail.value = resume ? `Fortsetzen möglich (ab Chunk ${resume.nextChunkIndex})` : ''
+    resumeDetail.value = resume ? t('download.resumePossible', { chunk: resume.nextChunkIndex }) : ''
   } catch {
     canResume.value = false
     resumeNextChunkIndex.value = null
@@ -63,22 +65,22 @@ async function preload() {
   uploadIdRef.value = uploadId
   if (!uploadId || !keyHash) {
     uiState.value = 'error'
-    uiMessage.value = 'Upload-ID oder Schlüssel fehlt'
+    uiMessage.value = t('download.missingIdOrKey')
     return
   }
   try {
     uiState.value = 'running'
-    uiMessage.value = 'Lade Metadaten...'
+    uiMessage.value = t('download.loadingMeta')
     const key = await importShareKey(keyHash)
     downloadKey.value = key
     await loadManifest(uploadId, key)
     await refreshResumeState(uploadId)
     uiState.value = 'idle'
-    uiMessage.value = 'Bereit zum Download'
+    uiMessage.value = t('download.ready')
   } catch (error) {
     console.error(error)
     uiState.value = 'error'
-    uiMessage.value = error instanceof Error ? error.message : 'Unbekannter Fehler'
+    uiMessage.value = error instanceof Error ? error.message : t('common.unknownError')
   }
 }
 
@@ -91,7 +93,7 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
   try {
     const uploadId = uploadIdRef.value ?? window.location.pathname.split('/').pop()
     const keyHash = new URLSearchParams(window.location.hash.slice(1)).get('key')
-    if (!uploadId || !keyHash) throw new Error('Upload-ID oder Schlüssel fehlt')
+    if (!uploadId || !keyHash) throw new Error(t('download.missingIdOrKey'))
 
     // Chrome/Edge: the file picker must be opened directly from the user gesture.
     // Don't await network/crypto work before calling `showSaveFilePicker`, otherwise it may be blocked.
@@ -101,27 +103,27 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       const shouldPick = typeof picker === 'function' && (mode === 'fresh' || !canResume.value)
       if (shouldPick) {
         const single = manifest.value?.files?.length === 1 ? manifest.value.files[0] : null
-        const rawName = single ? (single.name) : `secure-upload-${uploadId}.zip`
+        const rawName = single ? single.name : `secure-file-upload-${uploadId}.zip`
         const suggestedName = rawName.split(/[\\/]/).pop() || rawName
         preselectedHandle = await picker({ suggestedName })
       }
     } catch (error) {
       const name = (error as any)?.name
-      if (name === 'AbortError') throw new Error('Speichern abgebrochen')
+      if (name === 'AbortError') throw new Error(t('download.saveAborted'))
       throw error
     }
 
     const key = downloadKey.value ?? (await importShareKey(keyHash))
     downloadKey.value = key
     uiState.value = 'running'
-    uiMessage.value = 'Lade Metadaten...'
+    uiMessage.value = t('download.loadingMeta')
     await loadManifest(uploadId, key)
     await refreshResumeState(uploadId)
     if (mode === 'fresh') {
       await deleteDownloadResume(uploadId)
       await refreshResumeState(uploadId)
     }
-    uiMessage.value = mode === 'fresh' ? 'Starte Download neu...' : 'Lade verschlüsselte Datei herunter...'
+    uiMessage.value = mode === 'fresh' ? t('download.startingFresh') : t('download.downloading')
     progressPercent.value = 0
     progressDetail.value = ''
     await downloadAndDecryptWithManifest(uploadId, key, manifest.value, (percent, detail) => {
@@ -129,17 +131,18 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       progressDetail.value = detail
     }, { preselectedHandle })
     uiState.value = 'success'
-    uiMessage.value = 'Download abgeschlossen'
+    uiMessage.value = t('download.completed')
     await refreshResumeState(uploadId)
   } catch (error) {
     console.error(error)
     uiState.value = 'error'
-    uiMessage.value = error instanceof Error ? error.message : 'Unbekannter Fehler'
+    const errAny = error as any
+    const errorKey = typeof errAny?.errorKey === 'string' ? errAny.errorKey : undefined
+    uiMessage.value = errorKey ? t(`errors.${errorKey}`) : error instanceof Error ? error.message : t('common.unknownError')
     try {
       const uploadId = uploadIdRef.value ?? window.location.pathname.split('/').pop()
       if (uploadId) await refreshResumeState(uploadId)
     } catch {
-      // ignore
     }
   } finally {
     busy.value = false
@@ -149,8 +152,8 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
 
 <template>
   <section class="card" data-testid="download-page">
-    <h1>Secure Download</h1>
-    <p>Der Schlüssel wird aus dem URL-Fragment gelesen und nicht an den Server gesendet.</p>
+    <h1>{{ t('download.title') }}</h1>
+    <p>{{ t('download.keyInFragment') }}</p>
     <NoticeBar
       test-id="download:notice"
       :title="uiMessage"
@@ -166,10 +169,10 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       <span v-if="progressPercent !== null" class="muted small right">{{ progressPercent.toFixed(0) }}%</span>
     </div>
     <div v-if="manifest">
-      <h2>Dateien</h2>
+      <h2>{{ t('download.files') }}</h2>
       <div class="filelist download" data-testid="download:file-list">
         <div class="filelist-header">
-          <strong>{{ manifest.files.length }} Datei(en)</strong>
+          <strong>{{ t('common.filesCount', { count: manifest.files.length }) }}</strong>
           <span class="muted small right">{{ formatBytes(manifest.files.reduce((s, f) => s + f.size, 0)) }}</span>
         </div>
         <hr class="sep tight" />
@@ -182,9 +185,9 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       </div>
     </div>
     <div class="actions">
-      <button v-if="canResume" data-testid="download:btn-resume" :disabled="busy" @click="startDownload('resume')">Fortsetzen</button>
-      <button v-else data-testid="download:btn-start" :disabled="busy" @click="startDownload('fresh')">Herunterladen und entschlüsseln</button>
-      <button v-if="canResume" data-testid="download:btn-restart" class="secondary" :disabled="busy" @click="startDownload('fresh')">Neu starten</button>
+      <button v-if="canResume" data-testid="download:btn-resume" :disabled="busy" @click="startDownload('resume')">{{ t('common.resume') }}</button>
+      <button v-else data-testid="download:btn-start" :disabled="busy" @click="startDownload('fresh')">{{ t('download.downloadAndDecrypt') }}</button>
+      <button v-if="canResume" data-testid="download:btn-restart" class="secondary" :disabled="busy" @click="startDownload('fresh')">{{ t('common.restart') }}</button>
     </div>
   </section>
 </template>

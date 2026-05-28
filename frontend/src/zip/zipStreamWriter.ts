@@ -20,7 +20,6 @@ export async function createZipBlob(files: File[]): Promise<Blob> {
     try {
       await writer.close()
     } catch {
-      // ignore
     }
     throw error
   }
