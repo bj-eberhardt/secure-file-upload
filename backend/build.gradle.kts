@@ -117,3 +117,8 @@ tasks.named("build") {
 tasks.matching { it.name == "inspectRuntimeClasspath" }.configureEach {
     dependsOn(":frontend:copyFrontendToBackend")
 }
+
+// `processResources` consumes `backend/src/main/resources/**`, including the frontend bundle copied into `public/`.
+tasks.named<ProcessResources>("processResources") {
+    dependsOn(":frontend:copyFrontendToBackend")
+}

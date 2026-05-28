@@ -15,9 +15,8 @@ class ClientIpResolver(private val config: UploadConfiguration) {
             }
         }
         val remote = request.remoteAddress
-        return remote?.address?.hostAddress
-            ?: remote?.toString()
-            ?: "unknown"
+        return remote.address?.hostAddress
+            ?: remote.toString()
     }
 }
 
