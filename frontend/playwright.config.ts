@@ -12,13 +12,21 @@ const port = Number.parseInt(process.env.PW_PORT ?? '18080', 10) || 18080
 
 const gradleCmd = isWindows ? 'gradlew.bat' : './gradlew'
 
+const reporters: any[] = [
+  ['list'],
+  ['html', { open: 'never' }],
+  ['json', { outputFile: 'test-results/test-results.json' }],
+]
+if (isCi) reporters.push(['github'])
+
 export default defineConfig({
   testDir: 'tests/e2e',
   workers: isCi ? 1 : 1,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: isCi ? 1 : 0,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  outputDir: 'test-results',
+  reporter: reporters,
   use: {
     baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
