@@ -3,40 +3,15 @@ plugins {
 }
 
 node {
+    val nodeVersion = "22.13.0"
     download.set(true)
     // Vite 8 requires Node.js 20.19+ or 22.12+
-    version.set("22.12.0")
+    // Keep in sync with toolchain requirements of devDependencies (e.g. ESLint stack).
+    version.set(nodeVersion)
     // Use a stable, project-local directory to reduce Windows file lock issues during clean/build cycles.
-    workDir.set(rootProject.layout.projectDirectory.dir(".gradle-user-home/nodejs").asFile)
-    npmWorkDir.set(rootProject.layout.projectDirectory.dir(".gradle-user-home/npm").asFile)
-}
-
-// Prevent nodeSetup from running when the configured workDir already exists.
-// This avoids deleting/recreating the folder if a developer has a persistent local Node install here.
-// We use a tolerant reflection-based approach to support different plugin versions (File, Directory, Provider).
-tasks.named("nodeSetup") {
-    onlyIf {
-        val nodeExt = project.extensions.findByName("node")
-        val workDirFile = try {
-            val w = nodeExt?.javaClass?.getMethod("getWorkDir")?.invoke(nodeExt)
-            when (w) {
-                is java.io.File -> w
-                is org.gradle.api.file.Directory -> w.asFile
-                is org.gradle.api.provider.Provider<*> -> {
-                    val v = w.get()
-                    when (v) {
-                        is java.io.File -> v
-                        is org.gradle.api.file.Directory -> v.asFile
-                        else -> file("${'$'}buildDir/nodejs")
-                    }
-                }
-                else -> file("${'$'}buildDir/nodejs")
-            }
-        } catch (_: Exception) {
-            file("${'$'}buildDir/nodejs")
-        }
-        !workDirFile.exists()
-    }
+    // Version-scoped dirs avoid Windows file-lock issues when switching Node versions.
+    workDir.set(rootProject.layout.projectDirectory.dir(".gradle-user-home/nodejs/${'$'}nodeVersion").asFile)
+    npmWorkDir.set(rootProject.layout.projectDirectory.dir(".gradle-user-home/npm/${'$'}nodeVersion").asFile)
 }
 
 tasks.named<com.github.gradle.node.npm.task.NpmInstallTask>("npmInstall") {
@@ -45,8 +20,13 @@ tasks.named<com.github.gradle.node.npm.task.NpmInstallTask>("npmInstall") {
     args.set(listOf("install", "--cache", cacheDir, "--prefer-online", "--no-offline", "--no-audit", "--no-fund"))
 }
 
-tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmBuild") {
+tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmLint") {
     dependsOn("npmInstall")
+    args.set(listOf("run", "lint"))
+}
+
+tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmBuild") {
+    dependsOn("npmLint")
     environment.put("NODE_OPTIONS", "--require=./scripts/node-preload.cjs")
     args.set(listOf("run", "build"))
 }

@@ -27,6 +27,10 @@ const progressDetail = ref('')
 
 const noticeVariant = computed(() => (uiState.value === 'success' ? 'success' : uiState.value === 'error' ? 'error' : 'default'))
 
+function goToUploadHome() {
+  window.location.assign('/')
+}
+
 function displayName(file: PlainManifest['files'][number]): string {
   const rp = file.relativePath
   return rp && rp.length > 0 ? rp : file.name
@@ -151,9 +155,16 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
 </script>
 
 <template>
-  <section class="card" data-testid="download-page">
+  <section
+    class="card"
+    data-testid="download-page"
+    role="region"
+    :aria-label="t('download.title')"
+    aria-describedby="download-hint"
+    tabindex="0"
+  >
     <h1>{{ t('download.title') }}</h1>
-    <p>{{ t('download.keyInFragment') }}</p>
+    <p id="download-hint" class="hint">{{ t('download.keyInFragment') }}</p>
     <NoticeBar
       test-id="download:notice"
       :title="uiMessage"
@@ -188,6 +199,14 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       <button v-if="canResume" data-testid="download:btn-resume" :disabled="busy" @click="startDownload('resume')">{{ t('common.resume') }}</button>
       <button v-else data-testid="download:btn-start" :disabled="busy" @click="startDownload('fresh')">{{ t('download.downloadAndDecrypt') }}</button>
       <button v-if="canResume" data-testid="download:btn-restart" class="secondary" :disabled="busy" @click="startDownload('fresh')">{{ t('common.restart') }}</button>
+      <button
+        v-if="uiState === 'success'"
+        data-testid="download:btn-back-to-upload"
+        class="secondary"
+        @click="goToUploadHome"
+      >
+        {{ t('download.backToUpload') }}
+      </button>
     </div>
   </section>
 </template>

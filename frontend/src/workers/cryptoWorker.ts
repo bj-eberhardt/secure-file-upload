@@ -77,7 +77,7 @@ async function createZipReadableStream(files: File[]): Promise<ReadableStream<Ui
         })
       }
       await zipWriter.close()
-    } catch (error) {
+    } catch {
       try {
         await zipWriter.close()
       } catch {

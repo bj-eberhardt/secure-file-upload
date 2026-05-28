@@ -4,6 +4,7 @@ import { initUpload, completeUpload } from '../upload/chunkUploader'
 import { createShareKey, exportShareKey, importShareKey } from '../crypto/keyDerivation'
 import { computeFileFingerprint, type FileFingerprint } from '../upload/fileFingerprint'
 import NoticeBar from '../components/NoticeBar.vue'
+import InfoCallout from '../components/InfoCallout.vue'
 import { formatBytes } from '../utils/formatBytes'
 import { apiBase } from '../api/apiConfig'
 import { useI18n } from 'vue-i18n'
@@ -40,6 +41,7 @@ const isDone = computed(() => uiState.value === 'success')
 const isInProgress = computed(() => busy.value)
 const isPaused = computed(() => uiState.value === 'paused')
 const noticeVariant = computed(() => (uiState.value === 'success' ? 'success' : uiState.value === 'error' ? 'error' : 'default'))
+const uploadDescribedBy = computed(() => (showUploadForm.value ? 'upload-hint upload-promo' : undefined))
 
 function setFiles(selected: File[]) {
   files.value = selected
@@ -268,14 +270,29 @@ function cancel() {
     class="card"
     data-testid="upload-page"
     :class="{ dragging: isDragging }"
+    role="region"
+    :aria-label="t('upload.title')"
+    :aria-describedby="uploadDescribedBy"
+    tabindex="0"
     @drop="onDrop"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
   >
     <h1>{{ t('upload.title') }}</h1>
-    <p v-if="showUploadForm" class="hint">
+    <p v-if="showUploadForm" id="upload-hint" class="hint">
       {{ t('upload.hint') }}
     </p>
+
+    <InfoCallout
+      v-if="showUploadForm"
+      id="upload-promo"
+      test-id="upload:promo"
+      tone="brand"
+      icon-src="/privacy-browser-encryption.svg"
+      :title="t('upload.promoTitle')"
+    >
+      {{ t('upload.promoBody') }}
+    </InfoCallout>
 
     <NoticeBar
       test-id="upload:notice"
@@ -287,8 +304,10 @@ function cancel() {
     <div v-if="showUploadForm">
       <hr class="sep" />
 
+      <label class="sr-only" for="upload-file-input">{{ t('upload.fileLabel') }}</label>
       <input
         ref="fileInput"
+        id="upload-file-input"
         data-testid="upload:file-input"
         type="file"
         multiple
@@ -352,7 +371,11 @@ function cancel() {
     <div v-if="shareLink">
       <hr class="sep" />
       <h2>{{ t('upload.downloadLink') }}</h2>
-      <p class="muted">{{ t('upload.keyInFragment') }}</p>
+      <p class="muted">{{ t('upload.downloadLinkIntro') }}</p>
+      <InfoCallout test-id="upload:keyinfo" tone="soft" icon-src="/privacy-browser-encryption.svg" :title="t('upload.keyInfoTitle')">
+        <div>{{ t('upload.keyInFragment') }}</div>
+        <div class="keyinfo-body-spacer">{{ t('upload.keyInfoBody') }}</div>
+      </InfoCallout>
       <div class="sharebox">
         <input class="shareinput" data-testid="upload:share-link" readonly :value="shareLink" />
         <button class="secondary" data-testid="upload:btn-copy-link" @click="copyShareLink">
@@ -365,3 +388,9 @@ function cancel() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.keyinfo-body-spacer {
+  margin-top: 6px;
+}
+</style>
