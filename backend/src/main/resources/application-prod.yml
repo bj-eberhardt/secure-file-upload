@@ -1,4 +1,6 @@
-micronaut:
-  logger:
-    levels:
-      root: INFO
+logger:
+  levels:
+    root: INFO
+    io.micronaut: INFO
+    io.micronaut.http.server.netty: INFO
+    io.micronaut.management.health: INFO
