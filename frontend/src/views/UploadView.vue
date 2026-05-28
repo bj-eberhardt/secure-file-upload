@@ -33,6 +33,7 @@ const progressDetail = computed(() => (progressDetailKey.value ? t(progressDetai
 const isDragging = ref(false)
 
 let worker: Worker | null = null
+let cancelRequested = false
 
 const resumeInfo = ref<{
   uploadId: string
@@ -68,6 +69,7 @@ function removeFile(index: number) {
 
 function startNewUpload() {
   setFiles([])
+  cancelRequested = false
   uiState.value = 'idle'
   uiMessageKey.value = 'upload.ready'
   uiMessageParams.value = null
@@ -183,9 +185,18 @@ async function runWorkerUpload(init: { uploadId: string; chunkSize: number; prot
   })
 }
 
+function resetWorker() {
+  try {
+    worker?.terminate()
+  } catch {
+  }
+  worker = null
+}
+
 async function upload() {
   busy.value = true
   uiState.value = 'running'
+  cancelRequested = false
   uiMessageKey.value = 'upload.initializing'
   uiMessageParams.value = null
   uiMessageText.value = null
@@ -212,6 +223,7 @@ async function upload() {
     uiMessageKey.value = 'upload.encryptingUploading'
     const result = await runWorkerUpload(init, keyRaw)
 
+    if (cancelRequested) return
     uiMessageKey.value = 'upload.completing'
     const completed = await completeUpload(init.uploadId, result)
     shareLink.value = `${window.location.origin}${completed.downloadPath}#key=${exportedKey}`
@@ -249,6 +261,7 @@ async function resumeUpload() {
 
   busy.value = true
   uiState.value = 'running'
+  cancelRequested = false
   shareLink.value = ''
   progressPercent.value = null
   progressDetailKey.value = null
@@ -268,6 +281,7 @@ async function resumeUpload() {
     uiMessageKey.value = 'upload.resuming'
     const result = await runWorkerUpload(init, keyRaw)
 
+    if (cancelRequested) return
     uiMessageKey.value = 'upload.completing'
     const completed = await completeUpload(init.uploadId, result)
     shareLink.value = `${window.location.origin}${completed.downloadPath}#key=${info.key}`
@@ -297,7 +311,9 @@ async function resumeUpload() {
 function cancel() {
   if (!worker) return
   try {
+    cancelRequested = true
     worker.postMessage({ type: 'abort' })
+    resetWorker()
     uiState.value = 'paused'
     uiMessageKey.value = 'common.paused'
     uiMessageText.value = null

@@ -45,12 +45,41 @@ Install browser (Chromium):
 ./gradlew :frontend:npmPlaywrightInstall
 ```
 
+Install browsers (Chromium + Firefox):
+
+```bash
+./gradlew :frontend:npmPlaywrightInstallAll
+```
+
 The Gradle tasks use Playwright Chromium by default (and ignore any globally set `PW_CHANNEL`) to keep E2E runs deterministic. If you want to use a locally installed browser instead, run Playwright directly in `frontend/`, e.g. `PW_CHANNEL=chrome npm run test:e2e` (or `msedge`).
 
 Run E2E tests (prod-like: build + copy frontend, then run backend as web server):
 
 ```bash
 ./gradlew :frontend:npmE2e
+```
+
+Run E2E tests locally per browser (from `frontend/`):
+
+```bash
+# Install only Chromium (default)
+npm run test:e2e:install
+
+# Install Chromium + Firefox
+npm run test:e2e:install:all
+
+# Run only Chromium
+npm run test:e2e -- --project=chromium
+
+# Run only Firefox
+npm run test:e2e -- --project=firefox
+```
+
+UI mode (helps debugging a single browser/project):
+
+```bash
+npm run test:e2e:ui -- --project=chromium
+npm run test:e2e:ui -- --project=firefox
 ```
 
 Note: For deterministic E2E runs, Playwright starts its own backend with an E2E config (smaller chunk size, etc.) on port `18080` (so it does not collide with a dev backend on `8080`). To use a different port: `PW_PORT=18081 ./gradlew :frontend:npmE2e`. If you intentionally want to reuse an already running server (e.g. when developing individual tests), set `PW_REUSE_SERVER=true`.
