@@ -113,6 +113,7 @@ export const messages = {
     },
     errors: {
       BAD_REQUEST: 'Bad request',
+      ABORTED: 'Canceled',
       RATE_LIMITED: 'Too many requests. Please try again later.',
       UNKNOWN_UPLOAD: 'Unknown upload id',
       UPLOAD_EXPIRED: 'Upload expired',
@@ -207,6 +208,7 @@ export const messages = {
     },
     errors: {
       BAD_REQUEST: 'Ungültige Anfrage',
+      ABORTED: 'Abgebrochen',
       RATE_LIMITED: 'Zu viele Anfragen. Bitte später erneut versuchen.',
       UNKNOWN_UPLOAD: 'Unbekannte Upload-ID',
       UPLOAD_EXPIRED: 'Upload ist abgelaufen',

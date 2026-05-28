@@ -7,6 +7,7 @@ import NoticeBar from '../components/NoticeBar.vue'
 import InfoCallout from '../components/InfoCallout.vue'
 import { formatBytes } from '../utils/formatBytes'
 import { apiBase } from '../api/apiConfig'
+import { API_PREFIX } from '../api/apiConfig'
 import { useI18n } from 'vue-i18n'
 
 type UiState = 'idle' | 'running' | 'success' | 'error' | 'paused'
@@ -16,15 +17,25 @@ const { t } = useI18n()
 const fileInput = ref<HTMLInputElement | null>(null)
 const files = ref<File[]>([])
 const uiState = ref<UiState>('idle')
-const uiMessage = ref(t('upload.ready'))
+const uiMessageKey = ref('upload.ready')
+const uiMessageParams = ref<Record<string, unknown> | null>(null)
+const uiMessageText = ref<string | null>(null)
+const uiMessage = computed(() => {
+  if (uiMessageText.value) return uiMessageText.value
+  return uiMessageParams.value ? t(uiMessageKey.value, uiMessageParams.value) : t(uiMessageKey.value)
+})
 const shareLink = ref('')
 const busy = ref(false)
 const copied = ref(false)
 const progressPercent = ref<number | null>(null)
-const progressDetail = ref('')
+const progressDetailKey = ref<string | null>(null)
+const progressDetailText = ref('')
+const progressDetail = computed(() => (progressDetailKey.value ? t(progressDetailKey.value) : progressDetailText.value))
 const isDragging = ref(false)
 
 let worker: Worker | null = null
+let cancelRequested = false
+let cancelInFlightUpload: (() => void) | null = null
 
 const resumeInfo = ref<{
   uploadId: string
@@ -42,25 +53,32 @@ const isInProgress = computed(() => busy.value)
 const isPaused = computed(() => uiState.value === 'paused')
 const noticeVariant = computed(() => (uiState.value === 'success' ? 'success' : uiState.value === 'error' ? 'error' : 'default'))
 const uploadDescribedBy = computed(() => (showUploadForm.value ? 'upload-hint upload-promo' : undefined))
+const progressDetailVisible = computed(() => progressDetail.value.trim().length > 0)
 
 function setFiles(selected: File[]) {
   files.value = selected
   copied.value = false
   shareLink.value = ''
-  progressDetail.value = ''
+  progressDetailKey.value = null
+  progressDetailText.value = ''
 }
 
 function removeFile(index: number) {
   files.value = files.value.filter((_, i) => i !== index)
-  progressDetail.value = ''
+  progressDetailKey.value = null
+  progressDetailText.value = ''
 }
 
 function startNewUpload() {
   setFiles([])
+  cancelRequested = false
   uiState.value = 'idle'
-  uiMessage.value = t('upload.ready')
+  uiMessageKey.value = 'upload.ready'
+  uiMessageParams.value = null
+  uiMessageText.value = null
   progressPercent.value = null
-  progressDetail.value = ''
+  progressDetailKey.value = null
+  progressDetailText.value = ''
   copied.value = false
   shareLink.value = ''
   clearResumeInfo()
@@ -101,10 +119,8 @@ function onFilesChanged(event: Event) {
     computeFileFingerprint(files.value)
       .then((fp) => {
         if (!resumeInfo.value) return
-        progressDetail.value =
-          fp.valueB64u !== resumeInfo.value.fingerprint.valueB64u
-            ? t('upload.resumeMismatchHint')
-            : ''
+        progressDetailKey.value = fp.valueB64u !== resumeInfo.value.fingerprint.valueB64u ? 'upload.resumeMismatchHint' : null
+        progressDetailText.value = ''
       })
       .catch(() => {
       })
@@ -144,40 +160,89 @@ async function runWorkerUpload(init: { uploadId: string; chunkSize: number; prot
     const onMessage = (event: MessageEvent<any>) => {
       const data = event.data
       if (data?.type === 'progress') {
-        if (typeof data.messageKey === 'string') uiMessage.value = t(data.messageKey, data.messageParams ?? undefined)
+        if (typeof data.messageKey === 'string') {
+          uiMessageKey.value = data.messageKey
+          uiMessageParams.value = (data.messageParams ?? null) as Record<string, unknown> | null
+          uiMessageText.value = null
+        }
         if (typeof data.percent === 'number') progressPercent.value = data.percent
-        if (typeof data.detail === 'string') progressDetail.value = data.detail
+        if (typeof data.detail === 'string') {
+          progressDetailKey.value = null
+          progressDetailText.value = data.detail
+        }
       }
       if (data?.type === 'result') {
         w.removeEventListener('message', onMessage)
+        cancelInFlightUpload = null
         resolve(data.result)
       }
       if (data?.type === 'error') {
         w.removeEventListener('message', onMessage)
+        cancelInFlightUpload = null
         const err = new Error(typeof data.message === 'string' ? data.message : t('common.unknownError')) as any
         if (typeof data.errorKey === 'string') err.errorKey = data.errorKey
         reject(err)
       }
     }
     w.addEventListener('message', onMessage)
+
+    cancelInFlightUpload = () => {
+      try {
+        w.removeEventListener('message', onMessage)
+      } catch {
+      }
+      cancelInFlightUpload = null
+      const err = new Error('Aborted') as any
+      err.errorKey = 'ABORTED'
+      reject(err)
+    }
+
     w.postMessage({ type: 'upload', apiBase, init: { ...init }, files: Array.from(files.value), keyRaw }, [keyRaw])
   })
 }
 
+function resetWorker() {
+  try {
+    worker?.terminate()
+  } catch {
+  }
+  worker = null
+}
+
+async function isUploadCompleted(uploadId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${apiBase}${API_PREFIX}/uploads/${uploadId}/status`)
+    if (!response.ok) return false
+    const json = (await response.json()) as { completed?: boolean }
+    return !!json.completed
+  } catch {
+    return false
+  }
+}
+
 async function upload() {
+  let currentUploadId: string | null = null
+  let currentKey: string | null = null
+
   busy.value = true
   uiState.value = 'running'
-  uiMessage.value = t('upload.initializing')
+  cancelRequested = false
+  uiMessageKey.value = 'upload.initializing'
+  uiMessageParams.value = null
+  uiMessageText.value = null
   progressPercent.value = null
-  progressDetail.value = ''
+  progressDetailKey.value = null
+  progressDetailText.value = ''
   shareLink.value = ''
   try {
     const key = await createShareKey()
     const init = await initUpload()
+    currentUploadId = init.uploadId
     const exportedKey = await exportShareKey(key)
+    currentKey = exportedKey
     const keyRaw = await crypto.subtle.exportKey('raw', key)
 
-    uiMessage.value = t('upload.checkingFiles')
+    uiMessageKey.value = 'upload.checkingFiles'
     const fingerprint = await computeFileFingerprint(files.value)
     saveResumeInfo({
       uploadId: init.uploadId,
@@ -187,22 +252,42 @@ async function upload() {
       fingerprint
     })
 
-    uiMessage.value = t('upload.encryptingUploading')
+    uiMessageKey.value = 'upload.encryptingUploading'
     const result = await runWorkerUpload(init, keyRaw)
 
-    uiMessage.value = t('upload.completing')
+    if (cancelRequested) return
+    uiMessageKey.value = 'upload.completing'
     const completed = await completeUpload(init.uploadId, result)
     shareLink.value = `${window.location.origin}${completed.downloadPath}#key=${exportedKey}`
     uiState.value = 'success'
-    uiMessage.value = t('upload.done')
+    uiMessageKey.value = 'upload.done'
+    uiMessageParams.value = null
+    uiMessageText.value = null
     clearResumeInfo()
   } catch (error) {
     console.error(error)
     const errAny = error as any
     const errorKey = typeof errAny?.errorKey === 'string' ? errAny.errorKey : undefined
-    const message = errorKey ? t(`errors.${errorKey}`) : error instanceof Error ? error.message : t('common.unknownError')
+    if (errorKey === 'ABORTED') {
+      uiState.value = 'paused'
+      uiMessageKey.value = 'common.paused'
+      uiMessageText.value = null
+      return
+    }
+    if (errorKey === 'UPLOAD_CONFLICT' && currentUploadId && currentKey) {
+      // If the upload was completed despite a late pause/race, show the share link instead of failing.
+      if (await isUploadCompleted(currentUploadId)) {
+        shareLink.value = `${window.location.origin}/d/${currentUploadId}#key=${currentKey}`
+        uiState.value = 'success'
+        uiMessageKey.value = 'upload.done'
+        uiMessageText.value = null
+        clearResumeInfo()
+        return
+      }
+    }
     uiState.value = 'error'
-    uiMessage.value = message
+    uiMessageKey.value = errorKey ? `errors.${errorKey}` : 'common.unknownError'
+    uiMessageText.value = errorKey ? null : error instanceof Error ? error.message : null
   } finally {
     busy.value = false
   }
@@ -212,18 +297,22 @@ async function resumeUpload() {
   if (!resumeInfo.value) return
   if (files.value.length === 0) {
     uiState.value = 'error'
-    uiMessage.value = t('upload.reselectFiles')
+    uiMessageKey.value = 'upload.reselectFiles'
+    uiMessageText.value = null
     return
   }
 
   busy.value = true
   uiState.value = 'running'
+  cancelRequested = false
   shareLink.value = ''
   progressPercent.value = null
-  progressDetail.value = ''
+  progressDetailKey.value = null
+  progressDetailText.value = ''
   try {
     const info = resumeInfo.value
-    uiMessage.value = t('upload.checkingFilesResume')
+    uiMessageKey.value = 'upload.checkingFilesResume'
+    uiMessageText.value = null
     const currentFingerprint = await computeFileFingerprint(files.value)
     if (currentFingerprint.valueB64u !== info.fingerprint.valueB64u) {
       throw new Error(t('upload.resumeFingerprintMismatch'))
@@ -232,22 +321,42 @@ async function resumeUpload() {
     const keyRaw = await crypto.subtle.exportKey('raw', key)
     const init = { uploadId: info.uploadId, chunkSize: info.chunkSize, protocolVersion: info.protocolVersion }
 
-    uiMessage.value = t('upload.resuming')
+    uiMessageKey.value = 'upload.resuming'
     const result = await runWorkerUpload(init, keyRaw)
 
-    uiMessage.value = t('upload.completing')
+    if (cancelRequested) return
+    uiMessageKey.value = 'upload.completing'
     const completed = await completeUpload(init.uploadId, result)
     shareLink.value = `${window.location.origin}${completed.downloadPath}#key=${info.key}`
     uiState.value = 'success'
-    uiMessage.value = t('upload.done')
+    uiMessageKey.value = 'upload.done'
+    uiMessageParams.value = null
+    uiMessageText.value = null
     clearResumeInfo()
   } catch (error) {
     console.error(error)
     const errAny = error as any
     const errorKey = typeof errAny?.errorKey === 'string' ? errAny.errorKey : undefined
-    const message = errorKey ? t(`errors.${errorKey}`) : error instanceof Error ? error.message : t('common.unknownError')
+    if (errorKey === 'ABORTED') {
+      uiState.value = 'paused'
+      uiMessageKey.value = 'common.paused'
+      uiMessageText.value = null
+      return
+    }
+    if (errorKey === 'UPLOAD_CONFLICT' && resumeInfo.value) {
+      // If the upload was already completed (e.g. pause came too late), show the share link.
+      if (await isUploadCompleted(resumeInfo.value.uploadId)) {
+        shareLink.value = `${window.location.origin}/d/${resumeInfo.value.uploadId}#key=${resumeInfo.value.key}`
+        uiState.value = 'success'
+        uiMessageKey.value = 'upload.done'
+        uiMessageText.value = null
+        clearResumeInfo()
+        return
+      }
+    }
     uiState.value = 'error'
-    uiMessage.value = message
+    uiMessageKey.value = errorKey ? `errors.${errorKey}` : 'common.unknownError'
+    uiMessageText.value = errorKey ? null : error instanceof Error ? error.message : null
   } finally {
     busy.value = false
   }
@@ -256,10 +365,15 @@ async function resumeUpload() {
 function cancel() {
   if (!worker) return
   try {
+    cancelRequested = true
+    cancelInFlightUpload?.()
     worker.postMessage({ type: 'abort' })
+    resetWorker()
     uiState.value = 'paused'
-    uiMessage.value = t('common.paused')
-    progressDetail.value = ''
+    uiMessageKey.value = 'common.paused'
+    uiMessageText.value = null
+    progressDetailKey.value = null
+    progressDetailText.value = ''
   } catch {
   }
 }
@@ -362,7 +476,7 @@ function cancel() {
       <div v-if="progressPercent !== null" class="progress-wrap" data-testid="upload:progress">
         <progress class="bar" :value="progressPercent" max="100" />
       </div>
-      <div v-if="progressDetail" class="meta-row" data-testid="upload:progress-detail">
+      <div v-if="progressDetailVisible" class="meta-row" data-testid="upload:progress-detail">
         <span class="muted small">{{ progressDetail }}</span>
         <span v-if="progressPercent !== null" class="muted small right">{{ progressLabel }}</span>
       </div>

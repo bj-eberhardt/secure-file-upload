@@ -38,6 +38,10 @@ export default defineConfig({
       // Optional override: set `PW_CHANNEL=chrome` (or `msedge`) to use a locally installed browser.
       use: { ...devices['Desktop Chrome'], channel: process.env.PW_CHANNEL || undefined },
     },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
   ],
   webServer: {
     cwd: repoRoot,

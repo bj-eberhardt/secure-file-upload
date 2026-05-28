@@ -98,12 +98,13 @@ async function uploadEncrypted(
   files: File[],
   keyRaw: ArrayBuffer
 ): Promise<WorkerResult['result']> {
+  const PACK_OVERHEAD_BYTES = 36 // packEncryptedChunk header(8) + nonce(12) + AES-GCM tag(16)
   abortController = new AbortController()
   abortRequested = false
 
   const keyBytes = new Uint8Array(keyRaw)
   const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
-  const uploaded = await fetchUploadedChunks(apiBase, init.uploadId)
+  let uploaded = await fetchUploadedChunks(apiBase, init.uploadId)
   const estimatedTotalBytes = files.reduce((sum, f) => sum + f.size, 0)
   let processedPlainBytes = 0
 
@@ -132,12 +133,13 @@ async function uploadEncrypted(
       processedPlainBytes += plaintext.byteLength
 
       if (uploaded.has(index)) {
+        encryptedSize += plaintext.byteLength + PACK_OVERHEAD_BYTES
         index++
         const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
         post({
           type: 'progress',
           messageKey: 'upload.chunkAlreadyPresent',
-          messageParams: { chunk: index + 1 },
+          messageParams: { chunk: index },
           uploadedChunks: index,
           percent,
           detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
@@ -165,6 +167,24 @@ async function uploadEncrypted(
           message = typeof json?.message === 'string' ? json.message : message
         } catch {
         }
+        if (response.status === 409 && errorKey === 'UPLOAD_CONFLICT') {
+          // Race-safe resume: the previous attempt may have finished storing the chunk after the client paused.
+          uploaded = await fetchUploadedChunks(apiBase, init.uploadId)
+          if (uploaded.has(index)) {
+            encryptedSize += plaintext.byteLength + PACK_OVERHEAD_BYTES
+            index++
+            const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
+            post({
+              type: 'progress',
+              messageKey: 'upload.chunkAlreadyPresent',
+              messageParams: { chunk: index },
+              uploadedChunks: index,
+              percent,
+              detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
+            })
+            continue
+          }
+        }
         throw Object.assign(new Error(message), { errorKey })
       }
       encryptedSize += packed.byteLength
@@ -189,6 +209,7 @@ async function uploadEncrypted(
     const plaintext = buffer
     processedPlainBytes += plaintext.byteLength
     if (!uploaded.has(index)) {
+      let conflictSkipped = false
       const aad = new TextEncoder().encode(`${init.uploadId}:${index}:${init.protocolVersion}`)
       const encryptedChunk = await encryptChunkV1(key, index, plaintext, aad)
       const packed = packEncryptedChunk(encryptedChunk)
@@ -209,20 +230,40 @@ async function uploadEncrypted(
           message = typeof json?.message === 'string' ? json.message : message
         } catch {
         }
-        throw Object.assign(new Error(message), { errorKey })
+        if (response.status === 409 && errorKey === 'UPLOAD_CONFLICT') {
+          uploaded = await fetchUploadedChunks(apiBase, init.uploadId)
+          if (uploaded.has(index)) {
+            encryptedSize += plaintext.byteLength + PACK_OVERHEAD_BYTES
+            index++
+            const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
+            post({
+              type: 'progress',
+              messageKey: 'upload.chunkAlreadyPresent',
+              messageParams: { chunk: index },
+              uploadedChunks: index,
+              percent,
+              detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
+            })
+            conflictSkipped = true
+          }
+        }
+        if (!conflictSkipped) throw Object.assign(new Error(message), { errorKey })
       }
-      encryptedSize += packed.byteLength
-      index++
-      const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
-      post({
-        type: 'progress',
-        messageKey: 'progress.chunkUploaded',
-        messageParams: { chunk: index },
-        uploadedChunks: index,
-        percent,
-        detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
-      })
+      if (!conflictSkipped) {
+        encryptedSize += packed.byteLength
+        index++
+        const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
+        post({
+          type: 'progress',
+          messageKey: 'progress.chunkUploaded',
+          messageParams: { chunk: index },
+          uploadedChunks: index,
+          percent,
+          detail: `${Math.round(processedPlainBytes / (1024 * 1024))} / ${Math.round(estimatedTotalBytes / (1024 * 1024))} MiB`
+        })
+      }
     } else {
+      encryptedSize += plaintext.byteLength + PACK_OVERHEAD_BYTES
       index++
       const percent = estimatedTotalBytes > 0 ? Math.min(99, (processedPlainBytes / estimatedTotalBytes) * 100) : undefined
       post({
@@ -253,7 +294,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     abortRequested = true
     abortController?.abort()
     abortController = null
-    post({ type: 'error', message: 'Aborted' })
+    post({ type: 'error', errorKey: 'ABORTED', message: 'Aborted' })
     return
   }
 
