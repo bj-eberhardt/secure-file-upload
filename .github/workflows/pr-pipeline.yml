@@ -51,9 +51,12 @@ jobs:
 
       - name: Create Playwright summary
         if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node <<'EOF'
           const fs = require('fs');
+          const runUrl = process.env.RUN_URL || '';
 
           let summary = 'No JSON-testresults found.';
           let passed = 0;
@@ -106,7 +109,9 @@ jobs:
 
           </details>
 
-          The full html report can be downloaded at **artifacts → playwright-report**.
+          Workflow run: ${runUrl}
+
+          The full html report can be downloaded at **Artifacts -> playwright-report**.
           `;
 
           fs.writeFileSync('playwright-pr-comment.md', body);
