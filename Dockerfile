@@ -24,9 +24,11 @@ RUN apt-get update \
 
 # Copy the built jar from builder stage
 COPY --from=builder /workspace/backend/build/libs/*-all.jar /app/app.jar
+# Provide an explicit Logback config file on the filesystem so logback can always resolve it.
+COPY --from=builder /workspace/backend/src/main/resources/logback.xml /app/logback.xml
 
 # Runtime configuration
-ENV JAVA_OPTS="-Xms256m -Xmx768m -Dmicronaut.environments=prod"
+ENV JAVA_OPTS="-Xms256m -Xmx768m -Dmicronaut.environments=prod -Dlogback.configurationFile=/app/logback.xml"
 ENV SECURE_FILE_UPLOAD_STORAGE_DIR="/data/uploads"
 EXPOSE 8080
 
