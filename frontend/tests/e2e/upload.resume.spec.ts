@@ -7,7 +7,7 @@ test.describe('Upload (resume)', () => {
     await given('chunk uploads are slowed down a bit', async () => {
       await page.route(/\/api\/v1\/uploads\/.+\/chunks\/\d+$/, async (route) => {
         if (route.request().method() === 'PUT') {
-          await new Promise((r) => setTimeout(r, 75))
+          await new Promise((r) => setTimeout(r, 250))
         }
         await route.continue()
       })
@@ -15,7 +15,7 @@ test.describe('Upload (resume)', () => {
 
     await given('the upload page is open with a multi-chunk file selected', async () => {
       await uploadPage.goto()
-      await uploadPage.setFiles([makeFile('big.bin', 2 * 1024 * 1024)])
+      await uploadPage.setFiles([makeFile('big.bin', 8 * 1024 * 1024)])
     })
 
     await when('upload is started', async () => {
@@ -24,6 +24,8 @@ test.describe('Upload (resume)', () => {
     })
 
     await when('the upload is paused', async () => {
+      // Ensure at least one upload request is in-flight so the pause reliably aborts something.
+      await page.waitForRequest((req) => req.method() === 'PUT' && /\/api\/v1\/uploads\/.+\/chunks\/\d+$/.test(req.url()))
       await uploadPage.pause()
     })
 
@@ -33,6 +35,7 @@ test.describe('Upload (resume)', () => {
     })
 
     await when('upload is resumed', async () => {
+      await expect(uploadPage.resumeButton).toBeEnabled()
       await uploadPage.resume()
     })
 
