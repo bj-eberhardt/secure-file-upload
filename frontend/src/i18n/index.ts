@@ -43,6 +43,7 @@ export const messages = {
     },
     upload: {
       title: 'Start secure upload',
+      fileLabel: 'Select files to upload',
       promoTitle: 'Private by design',
       promoBody:
         'Your files are encrypted in the browser before upload. The server cannot read file contents or filenames - it only stores encrypted data.',
@@ -136,6 +137,7 @@ export const messages = {
     },
     upload: {
       title: 'Sicheren Upload starten',
+      fileLabel: 'Dateien zum Upload auswählen',
       promoTitle: 'Privat von Anfang an',
       promoBody:
         'Deine Dateien werden im Browser verschlüsselt, bevor sie hochgeladen werden. Der Server kann weder Inhalte noch Dateinamen lesen - er speichert nur verschlüsselte Daten.',

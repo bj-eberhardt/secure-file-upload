@@ -155,9 +155,16 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
 </script>
 
 <template>
-  <section class="card" data-testid="download-page">
+  <section
+    class="card"
+    data-testid="download-page"
+    role="region"
+    :aria-label="t('download.title')"
+    aria-describedby="download-hint"
+    tabindex="0"
+  >
     <h1>{{ t('download.title') }}</h1>
-    <p class="hint">{{ t('download.keyInFragment') }}</p>
+    <p id="download-hint" class="hint">{{ t('download.keyInFragment') }}</p>
     <NoticeBar
       test-id="download:notice"
       :title="uiMessage"

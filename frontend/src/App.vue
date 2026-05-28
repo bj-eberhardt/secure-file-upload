@@ -20,7 +20,7 @@ function switchLocale(next: 'en' | 'de') {
   <main class="page">
     <header class="topbar">
       <div class="brand">
-        <img class="brand-mark" src="/brand-mark.svg" alt="" width="28" height="28" />
+        <img class="brand-mark" src="/brand-mark.svg" alt="" aria-hidden="true" width="28" height="28" />
         <span class="brand-name">{{ t('app.productName') }}</span>
       </div>
       <div class="lang">

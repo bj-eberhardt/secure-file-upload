@@ -4,6 +4,7 @@ import { initUpload, completeUpload } from '../upload/chunkUploader'
 import { createShareKey, exportShareKey, importShareKey } from '../crypto/keyDerivation'
 import { computeFileFingerprint, type FileFingerprint } from '../upload/fileFingerprint'
 import NoticeBar from '../components/NoticeBar.vue'
+import InfoCallout from '../components/InfoCallout.vue'
 import { formatBytes } from '../utils/formatBytes'
 import { apiBase } from '../api/apiConfig'
 import { useI18n } from 'vue-i18n'
@@ -40,6 +41,7 @@ const isDone = computed(() => uiState.value === 'success')
 const isInProgress = computed(() => busy.value)
 const isPaused = computed(() => uiState.value === 'paused')
 const noticeVariant = computed(() => (uiState.value === 'success' ? 'success' : uiState.value === 'error' ? 'error' : 'default'))
+const uploadDescribedBy = computed(() => (showUploadForm.value ? 'upload-hint upload-promo' : undefined))
 
 function setFiles(selected: File[]) {
   files.value = selected
@@ -268,22 +270,29 @@ function cancel() {
     class="card"
     data-testid="upload-page"
     :class="{ dragging: isDragging }"
+    role="region"
+    :aria-label="t('upload.title')"
+    :aria-describedby="uploadDescribedBy"
+    tabindex="0"
     @drop="onDrop"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
   >
     <h1>{{ t('upload.title') }}</h1>
-    <p v-if="showUploadForm" class="hint">
+    <p v-if="showUploadForm" id="upload-hint" class="hint">
       {{ t('upload.hint') }}
     </p>
 
-    <aside v-if="showUploadForm" class="promo" data-testid="upload:promo">
-      <img class="promo-art" src="/privacy-browser-encryption.svg" alt="" width="120" height="96" />
-      <div class="promo-text">
-        <div class="promo-title">{{ t('upload.promoTitle') }}</div>
-        <div class="promo-body">{{ t('upload.promoBody') }}</div>
-      </div>
-    </aside>
+    <InfoCallout
+      v-if="showUploadForm"
+      id="upload-promo"
+      test-id="upload:promo"
+      tone="brand"
+      icon-src="/privacy-browser-encryption.svg"
+      :title="t('upload.promoTitle')"
+    >
+      {{ t('upload.promoBody') }}
+    </InfoCallout>
 
     <NoticeBar
       test-id="upload:notice"
@@ -295,8 +304,10 @@ function cancel() {
     <div v-if="showUploadForm">
       <hr class="sep" />
 
+      <label class="sr-only" for="upload-file-input">{{ t('upload.fileLabel') }}</label>
       <input
         ref="fileInput"
+        id="upload-file-input"
         data-testid="upload:file-input"
         type="file"
         multiple
@@ -361,16 +372,10 @@ function cancel() {
       <hr class="sep" />
       <h2>{{ t('upload.downloadLink') }}</h2>
       <p class="muted">{{ t('upload.downloadLinkIntro') }}</p>
-      <aside class="keyinfo" data-testid="upload:keyinfo">
-        <img class="keyinfo-art" src="/privacy-browser-encryption.svg" alt="" width="120" height="96" />
-        <div class="keyinfo-text">
-          <div class="keyinfo-title">{{ t('upload.keyInfoTitle') }}</div>
-          <div class="keyinfo-body">
-            <div>{{ t('upload.keyInFragment') }}</div>
-            <div class="keyinfo-body-spacer">{{ t('upload.keyInfoBody') }}</div>
-          </div>
-        </div>
-      </aside>
+      <InfoCallout test-id="upload:keyinfo" tone="soft" icon-src="/privacy-browser-encryption.svg" :title="t('upload.keyInfoTitle')">
+        <div>{{ t('upload.keyInFragment') }}</div>
+        <div class="keyinfo-body-spacer">{{ t('upload.keyInfoBody') }}</div>
+      </InfoCallout>
       <div class="sharebox">
         <input class="shareinput" data-testid="upload:share-link" readonly :value="shareLink" />
         <button class="secondary" data-testid="upload:btn-copy-link" @click="copyShareLink">
@@ -385,72 +390,7 @@ function cancel() {
 </template>
 
 <style scoped>
-.promo {
-  margin: 14px 0 10px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border, #dde4f0);
-  background: linear-gradient(135deg, rgba(51, 72, 255, 0.10), rgba(238, 242, 255, 0.85));
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: center;
-}
-.promo-art {
-  display: block;
-  filter: drop-shadow(0 14px 28px rgba(24, 33, 54, 0.12));
-}
-.promo-title {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  margin-bottom: 3px;
-}
-.promo-body {
-  color: var(--muted, #5c6b84);
-  line-height: 1.35;
-  font-size: 13px;
-}
-.keyinfo {
-  margin: 10px 0 12px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid var(--border, #dde4f0);
-  background: rgba(238, 242, 255, 0.55);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: center;
-}
-.keyinfo-art {
-  display: block;
-}
-.keyinfo-title {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  margin-bottom: 3px;
-}
-.keyinfo-body {
-  color: var(--muted, #5c6b84);
-  line-height: 1.35;
-  font-size: 13px;
-}
 .keyinfo-body-spacer {
   margin-top: 6px;
-}
-@media (max-width: 540px) {
-  .promo {
-    grid-template-columns: 1fr;
-  }
-  .promo-art {
-    width: 112px;
-    height: auto;
-  }
-  .keyinfo {
-    grid-template-columns: 1fr;
-  }
-  .keyinfo-art {
-    width: 112px;
-    height: auto;
-  }
 }
 </style>

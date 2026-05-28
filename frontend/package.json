@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--require=./scripts/node-preload.cjs vite --host 0.0.0.0",
     "build": "cross-env-shell NODE_OPTIONS=--require=./scripts/node-preload.cjs \"vue-tsc --noEmit && vite build\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "test:e2e": "cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
     "test:e2e:ui": "cross-env PLAYWRIGHT_BROWSERS_PATH=0 playwright test --ui",
@@ -19,10 +21,17 @@
     "vue-i18n": "10.0.6"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@playwright/test": "1.55.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-vue": "^6.0.7",
+    "eslint": "^9.0.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "globals": "^16.0.0",
     "typescript": "5.7.3",
     "vite": "^8.0.10",
+    "vue-eslint-parser": "^10.0.0",
     "vue-tsc": "2.1.10"
   }
 }
