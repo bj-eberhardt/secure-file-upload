@@ -23,6 +23,7 @@ jobs:
 
       - name: Build
         id: build
+        continue-on-error: false
         run: ./gradlew buildAll --no-daemon
 
       - name: Run end to end tests
