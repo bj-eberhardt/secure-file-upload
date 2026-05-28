@@ -4,6 +4,11 @@ export type SupportedLocale = 'en' | 'de'
 
 const LOCALE_STORAGE_KEY = 'secure-file-upload:locale'
 
+function syncDocumentLanguage(locale: SupportedLocale) {
+  if (typeof document === 'undefined') return
+  document.documentElement.lang = locale
+}
+
 function normalizeLocale(locale: string | null | undefined): SupportedLocale {
   const primary = (locale ?? '').trim().toLowerCase().split(/[-_]/)[0]
   return primary === 'de' ? 'de' : 'en'
@@ -23,7 +28,7 @@ function detectInitialLocale(): SupportedLocale {
 export const messages = {
   en: {
     app: {
-      productName: 'secure-file-upload',
+      productName: 'Secure File Upload',
       language: 'Language'
     },
     common: {
@@ -37,7 +42,10 @@ export const messages = {
       unknownError: 'Unknown error'
     },
     upload: {
-      title: 'secure-file-upload',
+      title: 'Start secure upload',
+      promoTitle: 'Private by design',
+      promoBody:
+        'Your files are encrypted in the browser before upload. The server cannot read file contents or filenames - it only stores encrypted data.',
       ready: 'Ready',
       initializing: 'Initializing upload...',
       checkingFiles: 'Checking files...',
@@ -54,23 +62,30 @@ export const messages = {
       finalizing: 'Upload finished, finalizing...',
       chunkAlreadyPresent: 'Chunk {chunk} already present (resume)',
       hint:
-        'Choose one or more files (drag & drop works too). Multiple files are packaged as a ZIP; a single file is uploaded raw.',
+        'Choose one or more files (drag & drop works too).',
       encryptedUpload: 'Upload encrypted',
       uploadMore: 'Upload more files securely',
       downloadLink: 'Download link',
+      downloadLinkIntro:
+        'Your files were encrypted first and then uploaded. The download link below can download the encrypted data and decrypt it in your browser.',
       keyInFragment: 'The key is in the URL fragment (#key=...) and is not sent to the server.',
+      keyInfoTitle: 'Why this matters',
+      keyInfoBody:
+        'The part after the # stays on your device. It is not sent to the server - not during upload, and not later during download. Only people with the full link can decrypt the files in their browser.',
       copyLink: 'Copy download link',
       copied: 'Copied',
       resumeMismatchHint: 'Note: selected files do not match the resume upload'
     },
     download: {
-      title: 'secure-file-upload',
-      keyInFragment: 'The key is read from the URL fragment and is not sent to the server.',
+      title: 'Start secure download',
+      keyInFragment:
+        'The link contains the decryption key after the #. This part stays on your device and is never sent to the server. Filenames and file contents are decrypted only in your browser.',
       ready: 'Ready to download',
       loadingMeta: 'Loading metadata...',
       startingFresh: 'Restarting download...',
       downloading: 'Downloading encrypted file...',
       completed: 'Download completed',
+      backToUpload: 'Upload your own files',
       saveAborted: 'Save canceled',
       missingIdOrKey: 'Upload id or key is missing',
       files: 'Files',
@@ -106,7 +121,7 @@ export const messages = {
   },
   de: {
     app: {
-      productName: 'secure-file-upload',
+      productName: 'Secure File Upload',
       language: 'Sprache'
     },
     common: {
@@ -120,7 +135,10 @@ export const messages = {
       unknownError: 'Unbekannter Fehler'
     },
     upload: {
-      title: 'secure-file-upload',
+      title: 'Sicheren Upload starten',
+      promoTitle: 'Privat von Anfang an',
+      promoBody:
+        'Deine Dateien werden im Browser verschlüsselt, bevor sie hochgeladen werden. Der Server kann weder Inhalte noch Dateinamen lesen - er speichert nur verschlüsselte Daten.',
       ready: 'Bereit',
       initializing: 'Initialisiere Upload...',
       checkingFiles: 'Prüfe Dateien...',
@@ -137,23 +155,30 @@ export const messages = {
       finalizing: 'Upload fertig, finalisiere...',
       chunkAlreadyPresent: 'Chunk {chunk} bereits vorhanden (resume)',
       hint:
-        'Wähle eine oder mehrere Dateien (Drag & Drop geht auch). Mehrere Dateien werden als ZIP verpackt, eine Datei wird roh hochgeladen.',
+        'Wähle eine oder mehrere Dateien (Drag & Drop geht auch).',
       encryptedUpload: 'Verschlüsselt hochladen',
       uploadMore: 'Weitere Dateien sicher hochladen',
       downloadLink: 'Download-Link',
+      downloadLinkIntro:
+        'Die Dateien wurden erfolgreich verschlüsselt und anschließend hochgeladen. Der folgende Download-Link lädt die verschlüsselten Daten herunter und entschlüsselt sie dann im Browser.',
       keyInFragment: 'Der Schlüssel steht im URL-Fragment (#key=...) und wird nicht an den Server gesendet.',
+      keyInfoTitle: 'Warum das wichtig ist',
+      keyInfoBody:
+        'Alles nach dem # bleibt auf deinem Gerät. Es wird nicht an den Server übertragen - weder beim Upload noch später beim Download. Nur wer den kompletten Link hat, kann die Dateien im Browser entschlüsseln.',
       copyLink: 'Download-Link kopieren',
       copied: 'Kopiert',
       resumeMismatchHint: 'Hinweis: ausgewählte Dateien passen nicht zum Resume-Upload'
     },
     download: {
-      title: 'secure-file-upload',
-      keyInFragment: 'Der Schlüssel wird aus dem URL-Fragment gelesen und nicht an den Server gesendet.',
+      title: 'Sicheren Download starten',
+      keyInFragment:
+        'Der Link enthält den Schlüssel nach dem #. Dieser Teil bleibt auf deinem Gerät und wird nie an den Server gesendet. Dateinamen und Inhalte werden ausschließlich in deinem Browser entschlüsselt.',
       ready: 'Bereit zum Download',
       loadingMeta: 'Lade Metadaten...',
       startingFresh: 'Starte Download neu...',
       downloading: 'Lade verschlüsselte Datei herunter...',
       completed: 'Download abgeschlossen',
+      backToUpload: 'Eigene Dateien hochladen',
       saveAborted: 'Speichern abgebrochen',
       missingIdOrKey: 'Upload-ID oder Schlüssel fehlt',
       files: 'Dateien',
@@ -199,9 +224,12 @@ export const i18n = createI18n({
 export function setLocale(locale: SupportedLocale) {
   i18n.global.locale.value = locale
   localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+  syncDocumentLanguage(locale)
 }
 
 export function t(key: string, params?: Record<string, unknown>): string {
   if (params) return i18n.global.t(key, params) as unknown as string
   return i18n.global.t(key) as unknown as string
 }
+
+syncDocumentLanguage(i18n.global.locale.value as SupportedLocale)

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 192" role="img" aria-label="browser encryption">
+  <defs>
+    <linearGradient id="g1" x1="56" y1="30" x2="194" y2="176" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3348ff" />
+      <stop offset="1" stop-color="#1e2bd4" />
+    </linearGradient>
+    <linearGradient id="g2" x1="70" y1="64" x2="178" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#eef2ff" />
+      <stop offset="1" stop-color="#ffffff" />
+    </linearGradient>
+  </defs>
+
+  <!-- Browser card -->
+  <rect x="24" y="24" width="192" height="144" rx="18" fill="#ffffff" opacity="0.9" />
+  <rect x="24" y="24" width="192" height="30" rx="18" fill="#eef2ff" />
+  <circle cx="44" cy="39" r="5" fill="#3348ff" opacity="0.65" />
+  <circle cx="62" cy="39" r="5" fill="#3348ff" opacity="0.35" />
+  <circle cx="80" cy="39" r="5" fill="#3348ff" opacity="0.2" />
+
+  <!-- Inner panel -->
+  <rect x="44" y="66" width="152" height="86" rx="14" fill="url(#g2)" stroke="#dde4f0" stroke-width="2" />
+
+  <!-- Shield -->
+  <path
+    d="M120 60 158 72v34c0 30-19 54-38 61-19-7-38-31-38-61V72l38-12Z"
+    fill="url(#g1)"
+  />
+
+  <!-- Lock -->
+  <rect x="104" y="110" width="32" height="26" rx="8" fill="#ffffff" opacity="0.96" />
+  <path
+    d="M110 110v-6.5c0-8 5.3-13 10-13s10 5 10 13v6.5"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="5"
+    stroke-linecap="round"
+    opacity="0.96"
+  />
+
+  <!-- Upload arrow -->
+  <path
+    d="M120 92v22m0-22 9 9m-9-9-9 9"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="4.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.98"
+  />
+</svg>
+

@@ -33,7 +33,6 @@ dependencies {
     ksp("io.micronaut:micronaut-inject-kotlin")
     ksp("io.micronaut.validation:micronaut-validation-processor")
     ksp("io.micronaut.serde:micronaut-serde-processor")
-    // Micronaut OpenAPI KSP processor - generates OpenAPI under META-INF/swagger
     ksp(libs.micronautOpenapi)
 
     implementation("io.micronaut.kotlin:micronaut-kotlin-runtime")
@@ -45,7 +44,6 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-    // Optional: swagger annotations if you want explicit swagger annotations
     implementation(libs.swaggerAnnotations)
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly(libs.snakeyaml)
@@ -116,9 +114,6 @@ tasks.named<ProcessResources>("processResources") {
     dependsOn(":frontend:copyFrontendToBackend")
 }
 
-// `:frontend:copyFrontendToBackend` writes into `backend/src/main/resources/public`.
-// `inspectRuntimeClasspath` reads the backend resources; declare the dependency explicitly
-// to satisfy Gradle task dependency validation (Gradle 9+).
 tasks.named("inspectRuntimeClasspath") {
     dependsOn(":frontend:copyFrontendToBackend")
 }
