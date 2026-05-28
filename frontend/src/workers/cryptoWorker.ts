@@ -253,7 +253,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     abortRequested = true
     abortController?.abort()
     abortController = null
-    post({ type: 'error', message: 'Aborted' })
+    post({ type: 'error', errorKey: 'ABORTED', message: 'Aborted' })
     return
   }
 

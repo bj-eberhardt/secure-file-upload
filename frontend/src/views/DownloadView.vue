@@ -14,16 +14,21 @@ import { API_PREFIX } from '../api/apiConfig'
 type UiState = 'idle' | 'running' | 'success' | 'error'
 const uiState = ref<UiState>('idle')
 const { t } = useI18n()
-const uiMessage = ref(t('download.ready'))
+const uiMessageKey = ref('download.ready')
+const uiMessageText = ref<string | null>(null)
+const uiMessage = computed(() => uiMessageText.value ?? t(uiMessageKey.value))
 const busy = ref(false)
 const manifest = ref<PlainManifest | null>(null)
 const canResume = ref(false)
-const resumeDetail = ref('')
 const resumeNextChunkIndex = ref<number | null>(null)
 const downloadKey = ref<CryptoKey | null>(null)
 const uploadIdRef = ref<string | null>(null)
 const progressPercent = ref<number | null>(null)
 const progressDetail = ref('')
+
+const resumeDetail = computed(() =>
+  resumeNextChunkIndex.value && resumeNextChunkIndex.value > 0 ? t('download.resumePossible', { chunk: resumeNextChunkIndex.value }) : ''
+)
 
 const noticeVariant = computed(() => (uiState.value === 'success' ? 'success' : uiState.value === 'error' ? 'error' : 'default'))
 
@@ -55,11 +60,9 @@ async function refreshResumeState(uploadId: string) {
     const resume = await getDownloadResume(uploadId)
     canResume.value = !!resume && resume.nextChunkIndex > 0
     resumeNextChunkIndex.value = resume ? resume.nextChunkIndex : null
-    resumeDetail.value = resume ? t('download.resumePossible', { chunk: resume.nextChunkIndex }) : ''
   } catch {
     canResume.value = false
     resumeNextChunkIndex.value = null
-    resumeDetail.value = ''
   }
 }
 
@@ -69,22 +72,26 @@ async function preload() {
   uploadIdRef.value = uploadId
   if (!uploadId || !keyHash) {
     uiState.value = 'error'
-    uiMessage.value = t('download.missingIdOrKey')
+    uiMessageKey.value = 'download.missingIdOrKey'
+    uiMessageText.value = null
     return
   }
   try {
     uiState.value = 'running'
-    uiMessage.value = t('download.loadingMeta')
+    uiMessageKey.value = 'download.loadingMeta'
+    uiMessageText.value = null
     const key = await importShareKey(keyHash)
     downloadKey.value = key
     await loadManifest(uploadId, key)
     await refreshResumeState(uploadId)
     uiState.value = 'idle'
-    uiMessage.value = t('download.ready')
+    uiMessageKey.value = 'download.ready'
+    uiMessageText.value = null
   } catch (error) {
     console.error(error)
     uiState.value = 'error'
-    uiMessage.value = error instanceof Error ? error.message : t('common.unknownError')
+    uiMessageText.value = error instanceof Error ? error.message : null
+    uiMessageKey.value = uiMessageText.value ? uiMessageKey.value : 'common.unknownError'
   }
 }
 
@@ -120,14 +127,15 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
     const key = downloadKey.value ?? (await importShareKey(keyHash))
     downloadKey.value = key
     uiState.value = 'running'
-    uiMessage.value = t('download.loadingMeta')
+    uiMessageKey.value = 'download.loadingMeta'
+    uiMessageText.value = null
     await loadManifest(uploadId, key)
     await refreshResumeState(uploadId)
     if (mode === 'fresh') {
       await deleteDownloadResume(uploadId)
       await refreshResumeState(uploadId)
     }
-    uiMessage.value = mode === 'fresh' ? t('download.startingFresh') : t('download.downloading')
+    uiMessageKey.value = mode === 'fresh' ? 'download.startingFresh' : 'download.downloading'
     progressPercent.value = 0
     progressDetail.value = ''
     await downloadAndDecryptWithManifest(uploadId, key, manifest.value, (percent, detail) => {
@@ -135,14 +143,16 @@ async function startDownload(mode: 'resume' | 'fresh' = 'resume') {
       progressDetail.value = detail
     }, { preselectedHandle })
     uiState.value = 'success'
-    uiMessage.value = t('download.completed')
+    uiMessageKey.value = 'download.completed'
+    uiMessageText.value = null
     await refreshResumeState(uploadId)
   } catch (error) {
     console.error(error)
     uiState.value = 'error'
     const errAny = error as any
     const errorKey = typeof errAny?.errorKey === 'string' ? errAny.errorKey : undefined
-    uiMessage.value = errorKey ? t(`errors.${errorKey}`) : error instanceof Error ? error.message : t('common.unknownError')
+    uiMessageText.value = errorKey ? null : error instanceof Error ? error.message : null
+    uiMessageKey.value = errorKey ? `errors.${errorKey}` : uiMessageText.value ? uiMessageKey.value : 'common.unknownError'
     try {
       const uploadId = uploadIdRef.value ?? window.location.pathname.split('/').pop()
       if (uploadId) await refreshResumeState(uploadId)
