@@ -209,7 +209,11 @@ export async function downloadAndDecrypt(uploadId: string, key: CryptoKey): Prom
   a.dataset.testid = 'download:anchor'
   ;(window as any).__pw_lastDownloadName = suggested
   document.body.appendChild(a)
-  a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+  try {
+    a.click()
+  } catch {
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+  }
   // Keep the anchor around briefly so E2E tests can assert attributes without racing.
   setTimeout(() => a.remove(), 1000)
   // Revoke after a short delay so Chromium has time to start the download.
@@ -226,13 +230,15 @@ export async function downloadAndDecryptWithManifest(
   const status = await fetchUploadStatus(uploadId)
 
   const single = manifest?.files?.length === 1 ? manifest.files[0] : null
-  const rawName = single ? (single.relativePath ?? single.name) : `secure-upload-${uploadId}.zip`
+  const rawName = single ? (single.name) : `secure-upload-${uploadId}.zip`
   const suggestedName = rawName.split(/[\\/]/).pop() || rawName
   const mimeType = single
     ? single.type && single.type.length > 0
       ? single.type
       : 'application/octet-stream'
     : 'application/zip'
+
+  console.debug('Final suggested download name:', { suggestedName, rawName, single })
 
   // E2E/debug hook: remember the intended filename early (independent of whether we use a picker or anchor fallback).
   try {
@@ -265,7 +271,11 @@ export async function downloadAndDecryptWithManifest(
   a.dataset.testid = 'download:anchor'
   ;(window as any).__pw_lastDownloadName = suggestedName
   document.body.appendChild(a)
-  a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+  try {
+    a.click()
+  } catch {
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+  }
   setTimeout(() => a.remove(), 1000)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

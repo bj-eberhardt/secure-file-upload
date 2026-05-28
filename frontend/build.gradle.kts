@@ -37,6 +37,12 @@ tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmPlaywrightInstall") 
     args.set(listOf("exec", "--", "playwright", "install", "chromium"))
 }
 
+tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmPlaywrightInstallAll") {
+    dependsOn("npmInstall")
+    environment.put("PLAYWRIGHT_BROWSERS_PATH", "0")
+    args.set(listOf("exec", "--", "playwright", "install", "chromium", "firefox"))
+}
+
 tasks.register<com.github.gradle.node.npm.task.NpmTask>("npmE2e") {
     dependsOn("copyFrontendToBackend")
     environment.put("PLAYWRIGHT_BROWSERS_PATH", "0")
