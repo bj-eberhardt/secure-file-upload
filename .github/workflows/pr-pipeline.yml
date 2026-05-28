@@ -23,7 +23,7 @@ jobs:
 
       - name: Build
         id: build
-        run: ./gradlew buildAll --no-daemon --plain
+        run: ./gradlew buildAll --no-daemon
 
       - name: Run end to end tests
         id: e2e
