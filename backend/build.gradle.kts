@@ -109,8 +109,16 @@ tasks.check {
 
 tasks.named("build") {
     dependsOn("shadowJar")
+    dependsOn(":frontend:copyFrontendToBackend")
 }
 
 tasks.named<ProcessResources>("processResources") {
+    dependsOn(":frontend:copyFrontendToBackend")
+}
+
+// `:frontend:copyFrontendToBackend` writes into `backend/src/main/resources/public`.
+// `inspectRuntimeClasspath` reads the backend resources; declare the dependency explicitly
+// to satisfy Gradle task dependency validation (Gradle 9+).
+tasks.named("inspectRuntimeClasspath") {
     dependsOn(":frontend:copyFrontendToBackend")
 }
