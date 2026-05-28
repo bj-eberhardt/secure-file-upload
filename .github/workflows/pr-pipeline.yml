@@ -51,12 +51,12 @@ jobs:
           let skipped = 0;
           let flaky = 0;
 
-          if (fs.existsSync('test-results/.last-run.json')) {
+          if (fs.existsSync('frontend/test-results/.last-run.json')) {
             summary = 'Playwright HTML-report was uploaded as artifact.';
           }
 
-          if (fs.existsSync('test-results.json')) {
-            const data = JSON.parse(fs.readFileSync('test-results.json', 'utf8'));
+          if (fs.existsSync('frontend/test-results/test-results.json')) {
+            const data = JSON.parse(fs.readFileSync('frontend/test-results/test-results.json', 'utf8'));
 
             function walkSuites(suites = []) {
               for (const suite of suites) {
