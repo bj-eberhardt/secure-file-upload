@@ -103,6 +103,7 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
+    dependsOn(tasks.jacocoTestReport)
 }
 
 tasks.named("build") {
