@@ -123,7 +123,7 @@ jobs:
             if (fs.existsSync(jacocoXml)) {
               try {
                 const xml = fs.readFileSync(jacocoXml, 'utf8');
-                const matches = [...xml.matchAll(/<counter\\s+type=\"LINE\"\\s+missed=\"(\\d+)\"\\s+covered=\"(\\d+)\"\\s*\\/?>(?:<\\/counter>)?/g)];
+                const matches = [...xml.matchAll(/<counter\s+type="LINE"\s+missed="(\d+)"\s+covered="(\d+)"\s*\/?>/g)];
                 const m = matches.length > 0 ? matches[matches.length - 1] : null;
                 if (m) {
                   const missed = Number(m[1] || 0);
