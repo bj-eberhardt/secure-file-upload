@@ -12,7 +12,7 @@ services:
     environment:
       - MICRONAUT_ENVIRONMENTS=prod
       - MICRONAUT_SERVER_PORT=8080
-      - JAVA_OPTS=${JAVA_OPTS:-"-Xms256m -Xmx768m"}
+      - JAVA_OPTS=${JAVA_OPTS:-"-Xms256m -Xmx768m -Dlogback.configurationFile=/app/logback.xml"}
       - SECURE_FILE_UPLOAD_STORAGE_DIR=${SECURE_FILE_UPLOAD_STORAGE_DIR:-/data/uploads}
     volumes:
       - uploads:/data/uploads
