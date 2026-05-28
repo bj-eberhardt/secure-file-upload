@@ -23,7 +23,8 @@ jobs:
 
       - name: Build
         id: build
-        run: ./gradlew buildAll --no-daemon --plain
+        continue-on-error: false
+        run: ./gradlew buildAll --no-daemon
 
       - name: Run end to end tests
         id: e2e
@@ -35,14 +36,27 @@ jobs:
         if: always()
         with:
           name: playwright-report
-          path: frontend/playwright-report/
+          path: frontend/playwright-report/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Playwright test results (json/trace)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: frontend/test-results/**
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Create Playwright summary
         if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node <<'EOF'
           const fs = require('fs');
+          const runUrl = process.env.RUN_URL || '';
 
           let summary = 'No JSON-testresults found.';
           let passed = 0;
@@ -50,12 +64,12 @@ jobs:
           let skipped = 0;
           let flaky = 0;
 
-          if (fs.existsSync('test-results/.last-run.json')) {
+          if (fs.existsSync('frontend/test-results/.last-run.json')) {
             summary = 'Playwright HTML-report was uploaded as artifact.';
           }
 
-          if (fs.existsSync('test-results.json')) {
-            const data = JSON.parse(fs.readFileSync('test-results.json', 'utf8'));
+          if (fs.existsSync('frontend/test-results/test-results.json')) {
+            const data = JSON.parse(fs.readFileSync('frontend/test-results/test-results.json', 'utf8'));
 
             function walkSuites(suites = []) {
               for (const suite of suites) {
@@ -95,7 +109,9 @@ jobs:
 
           </details>
 
-          The full html report can be downloaded at **artifacts → playwright-report**.
+          Workflow run: ${runUrl}
+
+          The full html report can be downloaded at **Artifacts -> playwright-report**.
           `;
 
           fs.writeFileSync('playwright-pr-comment.md', body);

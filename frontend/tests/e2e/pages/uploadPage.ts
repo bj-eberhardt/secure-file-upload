@@ -61,4 +61,3 @@ export class UploadPage {
     await this.newUploadButton.click()
   }
 }
-

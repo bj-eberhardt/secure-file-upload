@@ -6,14 +6,11 @@ ENV GRADLE_USER_HOME=/root/.gradle
 COPY gradlew gradle/ ./
 COPY gradle/ ./gradle/
 COPY settings.gradle.kts build.gradle.kts gradle.properties ./
-
-RUN chmod +x gradlew
-RUN --mount=type=cache,target=/root/.gradle ./gradlew :buildAll --no-daemon --console=plain
-
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 
-RUN ./gradlew :buildAll --no-daemon --console=plain --info
+RUN chmod +x gradlew
+RUN --mount=type=cache,target=/root/.gradle ./gradlew buildAll --no-daemon --console=plain
 
 # ---------------------------------------------------
 
@@ -30,7 +27,7 @@ COPY --from=builder /workspace/backend/build/libs/*-all.jar /app/app.jar
 
 # Runtime configuration
 ENV JAVA_OPTS="-Xms256m -Xmx768m -Dmicronaut.environments=prod"
-ENV SECURE_UPLOAD_STORAGE_DIR="/data/uploads"
+ENV SECURE_FILE_UPLOAD_STORAGE_DIR="/data/uploads"
 EXPOSE 8080
 
 # Create a non-root user

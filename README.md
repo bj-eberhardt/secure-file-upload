@@ -1,4 +1,4 @@
-# Secure Upload Skeleton
+# Secure File Upload
 
 Micronaut + Kotlin backend with a Vue/Vite/TypeScript frontend for client-side encrypted file uploads.
 
