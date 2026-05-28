@@ -7,6 +7,7 @@ import NoticeBar from '../components/NoticeBar.vue'
 import InfoCallout from '../components/InfoCallout.vue'
 import { formatBytes } from '../utils/formatBytes'
 import { apiBase } from '../api/apiConfig'
+import { API_PREFIX } from '../api/apiConfig'
 import { useI18n } from 'vue-i18n'
 
 type UiState = 'idle' | 'running' | 'success' | 'error' | 'paused'
@@ -34,6 +35,7 @@ const isDragging = ref(false)
 
 let worker: Worker | null = null
 let cancelRequested = false
+let cancelInFlightUpload: (() => void) | null = null
 
 const resumeInfo = ref<{
   uploadId: string
@@ -171,16 +173,30 @@ async function runWorkerUpload(init: { uploadId: string; chunkSize: number; prot
       }
       if (data?.type === 'result') {
         w.removeEventListener('message', onMessage)
+        cancelInFlightUpload = null
         resolve(data.result)
       }
       if (data?.type === 'error') {
         w.removeEventListener('message', onMessage)
+        cancelInFlightUpload = null
         const err = new Error(typeof data.message === 'string' ? data.message : t('common.unknownError')) as any
         if (typeof data.errorKey === 'string') err.errorKey = data.errorKey
         reject(err)
       }
     }
     w.addEventListener('message', onMessage)
+
+    cancelInFlightUpload = () => {
+      try {
+        w.removeEventListener('message', onMessage)
+      } catch {
+      }
+      cancelInFlightUpload = null
+      const err = new Error('Aborted') as any
+      err.errorKey = 'ABORTED'
+      reject(err)
+    }
+
     w.postMessage({ type: 'upload', apiBase, init: { ...init }, files: Array.from(files.value), keyRaw }, [keyRaw])
   })
 }
@@ -193,7 +209,21 @@ function resetWorker() {
   worker = null
 }
 
+async function isUploadCompleted(uploadId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${apiBase}${API_PREFIX}/uploads/${uploadId}/status`)
+    if (!response.ok) return false
+    const json = (await response.json()) as { completed?: boolean }
+    return !!json.completed
+  } catch {
+    return false
+  }
+}
+
 async function upload() {
+  let currentUploadId: string | null = null
+  let currentKey: string | null = null
+
   busy.value = true
   uiState.value = 'running'
   cancelRequested = false
@@ -207,7 +237,9 @@ async function upload() {
   try {
     const key = await createShareKey()
     const init = await initUpload()
+    currentUploadId = init.uploadId
     const exportedKey = await exportShareKey(key)
+    currentKey = exportedKey
     const keyRaw = await crypto.subtle.exportKey('raw', key)
 
     uiMessageKey.value = 'upload.checkingFiles'
@@ -241,6 +273,17 @@ async function upload() {
       uiMessageKey.value = 'common.paused'
       uiMessageText.value = null
       return
+    }
+    if (errorKey === 'UPLOAD_CONFLICT' && currentUploadId && currentKey) {
+      // If the upload was completed despite a late pause/race, show the share link instead of failing.
+      if (await isUploadCompleted(currentUploadId)) {
+        shareLink.value = `${window.location.origin}/d/${currentUploadId}#key=${currentKey}`
+        uiState.value = 'success'
+        uiMessageKey.value = 'upload.done'
+        uiMessageText.value = null
+        clearResumeInfo()
+        return
+      }
     }
     uiState.value = 'error'
     uiMessageKey.value = errorKey ? `errors.${errorKey}` : 'common.unknownError'
@@ -300,6 +343,17 @@ async function resumeUpload() {
       uiMessageText.value = null
       return
     }
+    if (errorKey === 'UPLOAD_CONFLICT' && resumeInfo.value) {
+      // If the upload was already completed (e.g. pause came too late), show the share link.
+      if (await isUploadCompleted(resumeInfo.value.uploadId)) {
+        shareLink.value = `${window.location.origin}/d/${resumeInfo.value.uploadId}#key=${resumeInfo.value.key}`
+        uiState.value = 'success'
+        uiMessageKey.value = 'upload.done'
+        uiMessageText.value = null
+        clearResumeInfo()
+        return
+      }
+    }
     uiState.value = 'error'
     uiMessageKey.value = errorKey ? `errors.${errorKey}` : 'common.unknownError'
     uiMessageText.value = errorKey ? null : error instanceof Error ? error.message : null
@@ -312,6 +366,7 @@ function cancel() {
   if (!worker) return
   try {
     cancelRequested = true
+    cancelInFlightUpload?.()
     worker.postMessage({ type: 'abort' })
     resetWorker()
     uiState.value = 'paused'
